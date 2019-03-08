@@ -122,7 +122,7 @@ ENDFORM.
 FORM data_retrieval .
 
   DATA:
-    es_cofile TYPE ctslg_cofile,
+    ls_cofile TYPE ctslg_cofile,
     ls_alv    TYPE ty_alv.
 
   FIELD-SYMBOLS:
@@ -134,13 +134,13 @@ FORM data_retrieval .
 
   LOOP AT it_requests ASSIGNING <fs_requests> WHERE trfunction IN cs_ranges-request_funcs.
 
-    CLEAR ls_alv.
+    CLEAR: ls_alv.
 
     CALL FUNCTION 'TR_READ_GLOBAL_INFO_OF_REQUEST'
       EXPORTING
         iv_trkorr = <fs_requests>-trkorr
       IMPORTING
-        es_cofile = es_cofile.
+        es_cofile = ls_cofile.
 
     IF <fs_requests>-trstatus EQ 'D'. "D  Modificável
       MOVE-CORRESPONDING <fs_requests> TO ls_alv.
@@ -154,9 +154,9 @@ FORM data_retrieval .
 
     ENDIF.
 
-    LOOP AT es_cofile-systems ASSIGNING <fs_system>.
+    LOOP AT ls_cofile-systems ASSIGNING <fs_system>.
 
-      LOOP AT <fs_system>-steps ASSIGNING <fs_step> WHERE clientid NE space. " step of transport
+      LOOP AT <fs_system>-steps ASSIGNING <fs_step>. "WHERE clientid NE space. " step of transport
 
         CLEAR ls_alv.
 
@@ -352,8 +352,8 @@ FORM f_delete_system_not_final USING  p_sys .
 
   MOVE it_alv TO lt_alv.
 
-  LOOP AT lt_alv INTO ls_alv WHERE systemid = p_sys.
-    DELETE it_alv WHERE trkorr = ls_alv-trkorr AND systemid NE ls_alv-systemid.
+  LOOP AT lt_alv ASSIGNING FIELD-SYMBOL(<fs_s_alv>) WHERE systemid = p_sys.
+    DELETE it_alv WHERE trkorr = <fs_s_alv>-trkorr AND systemid NE <fs_s_alv>-systemid.
   ENDLOOP.
 
   DELETE ADJACENT DUPLICATES FROM it_alv COMPARING trkorr systemid.
