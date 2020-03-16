@@ -629,6 +629,15 @@
       <FUN_TEXT>1ª página</FUN_TEXT>
      </RSMPE_FUNT>
      <RSMPE_FUNT>
+      <CODE>RDDIT076</CODE>
+      <TEXTNO>001</TEXTNO>
+      <TEXT_TYPE>S</TEXT_TYPE>
+      <TEXT_NAME>ICON_DETAIL</TEXT_NAME>
+      <ICON_ID>@3R@</ICON_ID>
+      <FUN_TEXT>Alterar dados da Request</FUN_TEXT>
+      <INFO_TEXT>Alterar dados da Request</INFO_TEXT>
+     </RSMPE_FUNT>
+     <RSMPE_FUNT>
       <CODE>REFRESH</CODE>
       <TEXTNO>001</TEXTNO>
       <TEXT_TYPE>S</TEXT_TYPE>
@@ -1832,6 +1841,12 @@
       <NO>26</NO>
       <PFNO>36</PFNO>
      </RSMPE_BUT>
+     <RSMPE_BUT>
+      <PFK_CODE>000002</PFK_CODE>
+      <CODE>0001</CODE>
+      <NO>27</NO>
+      <PFNO>07</PFNO>
+     </RSMPE_BUT>
     </BUT>
     <PFK>
      <RSMPE_PFK>
@@ -2132,6 +2147,12 @@
       <CODE>000002</CODE>
       <PFNO>06</PFNO>
       <FUNCODE>&amp;SAL</FUNCODE>
+      <FUNNO>001</FUNNO>
+     </RSMPE_PFK>
+     <RSMPE_PFK>
+      <CODE>000002</CODE>
+      <PFNO>07</PFNO>
+      <FUNCODE>RDDIT076</FUNCODE>
       <FUNNO>001</FUNNO>
      </RSMPE_PFK>
      <RSMPE_PFK>
@@ -2772,6 +2793,10 @@
      </RSMPE_STAF>
      <RSMPE_STAF>
       <STATUS>ALV_STATUS</STATUS>
+      <FUNCTION>RDDIT076</FUNCTION>
+     </RSMPE_STAF>
+     <RSMPE_STAF>
+      <STATUS>ALV_STATUS</STATUS>
       <FUNCTION>REFRESH</FUNCTION>
      </RSMPE_STAF>
      <RSMPE_STAF>
@@ -2852,7 +2877,7 @@
       <OBJ_TYPE>A</OBJ_TYPE>
       <OBJ_CODE>000002</OBJ_CODE>
       <MODAL>D</MODAL>
-      <INT_NOTE>Barra de Menu SALV_TABLE_STANDARD</INT_NOTE>
+      <INT_NOTE>Barra de Menu ZREQUEST_REPORT</INT_NOTE>
      </RSMPE_ATRT>
      <RSMPE_ATRT>
       <OBJ_TYPE>P</OBJ_TYPE>
@@ -2865,7 +2890,7 @@
       <OBJ_TYPE>B</OBJ_TYPE>
       <OBJ_CODE>000002</OBJ_CODE>
       <SUB_CODE>0001</SUB_CODE>
-      <INT_NOTE>SALV_TABLE_STANDARD</INT_NOTE>
+      <INT_NOTE>ZREQUEST_REPORT</INT_NOTE>
      </RSMPE_ATRT>
     </DOC>
    </CUA>

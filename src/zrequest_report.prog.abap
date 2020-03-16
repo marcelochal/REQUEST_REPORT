@@ -28,7 +28,8 @@ CLASS lcl_zrequest_report DEFINITION FINAL.
         client       TYPE trclient,
         systemid     TYPE tarsystem,  " target system
         rc           TYPE strw_int4,  " return code
-        rc_icon      TYPE tp_icon,    " return code
+*        rc_icon      TYPE tp_icon,    " return code
+        rc_icon      TYPE icon_l4,    " return code
         trstatus     TYPE trstatus,
         trstatus_txt TYPE trstatus_t,
         date         TYPE as4date,
@@ -81,8 +82,7 @@ CLASS lcl_zrequest_report DEFINITION FINAL.
       END OF co_task_function.
 
     DATA:
-      gt_alv       TYPE ty_t_alv,
-      go_alv_table TYPE REF TO cl_salv_table.
+      gt_alv       TYPE ty_t_alv.
 
 *--------------------------------------------------------------------*
 *-------------         METHODS PUBLIC SECTION           -------------*
@@ -102,10 +102,12 @@ CLASS lcl_zrequest_report DEFINITION FINAL.
   PRIVATE SECTION.
 
     DATA:
+      go_alv_table        TYPE REF TO cl_salv_table,
       go_alv_layout       TYPE REF TO cl_salv_layout,
       go_alv_top_of_list  TYPE REF TO cl_salv_form_layout_grid,
       go_alv_flow_num_rec TYPE REF TO cl_salv_form_layout_flow,
       go_alv_flow_date    TYPE REF TO cl_salv_form_layout_flow,
+      go_alv_selections   TYPE REF TO cl_salv_selections,
       go_msg_ind          TYPE REF TO zcl_progress_indicator,
       gt_requests         TYPE trwbo_request_headers,
       gs_selection        TYPE trwbo_selection,
@@ -139,7 +141,9 @@ CLASS lcl_zrequest_report DEFINITION FINAL.
       alv_set_tr_text
         CHANGING
           ch_s_alv TYPE lcl_zrequest_report=>ty_s_alv,
-      alv_set_columns.
+      alv_set_columns,
+      call_rddit076,
+      alv_create_header_and_footer.
 
 
 ENDCLASS.
@@ -385,6 +389,9 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
             me->trint_select_requests( im_v_refresh = abap_on ),
             me->go_alv_table->refresh.
 
+      WHEN 'RDDIT076'.
+        CALL METHOD me->call_rddit076( ).
+
     ENDCASE.
 
   ENDMETHOD.
@@ -442,13 +449,8 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
   METHOD alv_create.
 
     DATA:
-      lo_events                  TYPE REF TO cl_salv_events_table,
-      lo_alv_display_settings    TYPE REF TO cl_salv_display_settings,
-      lo_alv_functional_settings TYPE REF TO cl_salv_functional_settings,
-      lo_alv_selections          TYPE REF TO cl_salv_selections,
-      lo_functions_list          TYPE REF TO cl_salv_functions_list,
-      ls_layout_key              TYPE salv_s_layout_key,
-      lo_label                   TYPE REF TO cl_salv_form_label.
+      lo_events     TYPE REF TO cl_salv_events_table,
+      ls_layout_key TYPE salv_s_layout_key.
 
     TRY.
 
@@ -465,38 +467,35 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
             pfstatus      = 'ALV_STATUS'                        " Screens, Current GUI Status
             set_functions = me->go_alv_table->c_functions_all.  " ALV: Data Element for Constants
 
-        lo_functions_list  = me->go_alv_table->get_functions( ).
-        lo_functions_list->set_all( abap_true ).
+        me->go_alv_table->get_functions( )->set_all( abap_true ).
 
         " Set Display Settings
-        lo_alv_display_settings = me->go_alv_table->get_display_settings( ).
-        lo_alv_display_settings->set_horizontal_lines( abap_true ).
-        lo_alv_display_settings->set_striped_pattern( abap_true ).
+        me->go_alv_table->get_display_settings( )->set_horizontal_lines( abap_true ).
+        me->go_alv_table->get_display_settings( )->set_striped_pattern( abap_true ).
 
         " Set Functional Settings
-        lo_alv_functional_settings = me->go_alv_table->get_functional_settings( ).
-        lo_alv_functional_settings->set_sort_on_header_click( abap_true ).
+        me->go_alv_table->get_functional_settings( )->set_sort_on_header_click( abap_true ).
 
-        lo_alv_selections = me->go_alv_table->get_selections( ).
-        lo_alv_selections->set_selection_mode( if_salv_c_selection_mode=>single ).
+        " Set Selections Type
+        me->go_alv_table->get_selections( )->set_selection_mode( if_salv_c_selection_mode=>row_column ).
 
         " Set Columns Parameters
-        CALL METHOD me->alv_set_columns.
+        me->alv_set_columns( ).
 
         " Set Layout
-        go_alv_layout ?= me->go_alv_table->get_layout( ).
         ls_layout_key-report = sy-repid.
-        go_alv_layout->set_key( ls_layout_key ).
-        go_alv_layout->set_save_restriction( if_salv_c_layout=>restrict_none ).
-        DATA(lv_has_layout_default) = go_alv_layout->has_default( ).
-        DATA(salv_s_layout) = go_alv_layout->get_default_layout( ).
+        me->go_alv_table->get_layout( )->set_key( ls_layout_key ).
+        me->go_alv_table->get_layout( )->set_save_restriction( if_salv_c_layout=>restrict_none ).
 
-        CREATE OBJECT go_alv_top_of_list.
-        CALL METHOD me->go_alv_table->set_top_of_list( value = go_alv_top_of_list ).
+        DATA(lv_has_layout_default) = me->go_alv_table->get_layout( )->has_default( ).
+        DATA(salv_s_layout)         = me->go_alv_table->get_layout( )->get_default_layout( ).
 
-        " Header Top Of Page
-        lo_label = go_alv_top_of_list->create_label( row = 1 column  = 1 ).
-        lo_label->set_text( value = 'Relatório de Requests'(002) ).
+        CREATE OBJECT go_alv_top_of_list
+          EXPORTING
+            columns = 3.
+        me->go_alv_table->set_top_of_list( value = go_alv_top_of_list ).
+
+*        me->alv_create_header_and_footer( ).
 
         "events
         lo_events = me->go_alv_table->get_event( ).
@@ -504,8 +503,9 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
         SET HANDLER me->on_alv_double_click     FOR lo_events.
         SET HANDLER me->on_alv_user_command     FOR lo_events.
 
-      CATCH cx_root.
+      CATCH cx_root INTO DATA(lcx_root).
         " Deu ruim!
+        MESSAGE lcx_root->get_longtext( ) TYPE 'E'.
 
     ENDTRY.
 
@@ -565,7 +565,7 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
       ls_ddic_reference TYPE salv_s_ddic_reference.
 
     TRY.
-        lo_alv_columns = me->go_alv_table->get_columns( ).
+        lo_alv_columns ?= me->go_alv_table->get_columns( ).
         lo_alv_columns->set_optimize( abap_true ).
 
         zcl_utils=>get_field_list(
@@ -623,10 +623,103 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
 
 
         ENDLOOP.
-      CATCH cx_salv_not_found. " ALV: General Error Class (Checked During Syntax Check)
-      CATCH cx_root.
+      CATCH cx_root INTO DATA(lcx_root).
+        MESSAGE lcx_root->get_text( ) TYPE 'E'.
     ENDTRY.
 
   ENDMETHOD.
 
+
+  METHOD call_rddit076.
+
+    DATA:
+        lt_rows TYPE salv_t_row.
+
+    lt_rows  = me->go_alv_table->get_selections( )->get_selected_rows( ).
+
+    LOOP AT lt_rows ASSIGNING FIELD-SYMBOL(<row>).
+      READ TABLE me->gt_alv ASSIGNING FIELD-SYMBOL(<alv>) INDEX <row>.
+      IF syst-subrc IS INITIAL.
+
+        CALL FUNCTION 'TRINT_DISPLAY_REQUEST_HEADER'
+          EXPORTING
+            iv_read_only = abap_off
+            iv_trkorr    = <alv>-trkorr
+          EXCEPTIONS
+            OTHERS       = 5.
+
+        IF sy-subrc NE 0.
+          MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+            WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+        ENDIF.
+
+      ENDIF.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD alv_create_header_and_footer .
+    DATA:
+*          lr_top_element TYPE REF TO cl_salv_form_layout_grid,
+      lr_end_element TYPE REF TO cl_salv_form_layout_flow,
+      lr_grid        TYPE REF TO cl_salv_form_layout_grid,
+*          lr_header      TYPE REF TO cl_salv_form_header_info,
+      lr_action      TYPE REF TO cl_salv_form_action_info,
+      lr_textview1   TYPE REF TO cl_salv_form_text,
+      lr_picture     TYPE REF TO cl_salv_form_picture,
+      lr_label       TYPE REF TO cl_salv_form_label.
+
+    TRY.
+        " Header Top Of Page
+*    lr_label = go_alv_top_of_list->create_label( row = 1 column  = 1 ).
+*    lr_label->set_text( value =  ).
+
+        CREATE OBJECT go_alv_top_of_list
+          EXPORTING
+            columns = 2.
+
+        go_alv_top_of_list->create_header_information(
+          EXPORTING
+            row     = 1                 " Natural Number
+            column  = 1                 " Natural Number
+            text    = 'Relatório de Requests'(002)
+            tooltip = 'Relatório de Requests'(002)   ).
+
+
+        lr_grid = go_alv_top_of_list->create_grid( row    = 3
+                                                   column = 1 ).
+
+
+        lr_textview1 = lr_grid->create_text(
+            row     = 1
+            column  = 1
+            text    = 'teste texto Row 1 Coluna 1'
+            tooltip = 'Tooltip' ).
+
+
+        CREATE OBJECT lr_picture
+          EXPORTING
+            picture_id = 'Z_SAPGUI_MC_001.PNG'.
+
+        CALL METHOD lr_grid->set_element
+          EXPORTING
+            row       = 4
+            column    = 1
+            r_element = lr_picture.
+
+        me->go_alv_table->set_top_of_list( value = go_alv_top_of_list ).
+
+*    DATA: lr_eol TYPE REF TO cl_salv_form_header_info.
+*    CREATE OBJECT lr_eol
+*      EXPORTING
+*        text = 'This is my Footer'.
+*
+*    me->go_alv_table->set_end_of_list( lr_eol ).
+
+      CATCH cx_root INTO DATA(lcx_root).
+        MESSAGE lcx_root->get_text( ) TYPE 'E'.
+    ENDTRY.
+
+  ENDMETHOD.
 ENDCLASS.
