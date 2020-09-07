@@ -605,6 +605,15 @@
       <PATH>A</PATH>
      </RSMPE_FUNT>
      <RSMPE_FUNT>
+      <CODE>DOWN_TR</CODE>
+      <TEXTNO>001</TEXTNO>
+      <TEXT_TYPE>S</TEXT_TYPE>
+      <TEXT_NAME>ICON_EXPORT</TEXT_NAME>
+      <ICON_ID>@49@</ICON_ID>
+      <FUN_TEXT>Download de Requests</FUN_TEXT>
+      <INFO_TEXT>Download de Requests para o PC</INFO_TEXT>
+     </RSMPE_FUNT>
+     <RSMPE_FUNT>
       <CODE>P+</CODE>
       <TEXTNO>001</TEXTNO>
       <TEXT_TYPE>S</TEXT_TYPE>
@@ -644,6 +653,33 @@
       <TEXT_NAME>ICON_REFRESH</TEXT_NAME>
       <ICON_ID>@42@</ICON_ID>
       <FUN_TEXT>Renovar</FUN_TEXT>
+     </RSMPE_FUNT>
+     <RSMPE_FUNT>
+      <CODE>TR_EXPORT</CODE>
+      <TEXTNO>001</TEXTNO>
+      <TEXT_TYPE>S</TEXT_TYPE>
+      <TEXT_NAME>ICON_EXPORT</TEXT_NAME>
+      <ICON_ID>@49@</ICON_ID>
+      <FUN_TEXT>Download de Requests</FUN_TEXT>
+      <INFO_TEXT>Download de Requests para o PC</INFO_TEXT>
+     </RSMPE_FUNT>
+     <RSMPE_FUNT>
+      <CODE>TR_IMPORT</CODE>
+      <TEXTNO>001</TEXTNO>
+      <TEXT_TYPE>S</TEXT_TYPE>
+      <TEXT_NAME>ICON_IMPORT</TEXT_NAME>
+      <ICON_ID>@48@</ICON_ID>
+      <FUN_TEXT>Importar request externas</FUN_TEXT>
+      <INFO_TEXT>Importar arquivos de request externas</INFO_TEXT>
+     </RSMPE_FUNT>
+     <RSMPE_FUNT>
+      <CODE>UPLOAD_TR</CODE>
+      <TEXTNO>001</TEXTNO>
+      <TEXT_TYPE>S</TEXT_TYPE>
+      <TEXT_NAME>ICON_IMPORT</TEXT_NAME>
+      <ICON_ID>@48@</ICON_ID>
+      <FUN_TEXT>Importar request externas</FUN_TEXT>
+      <INFO_TEXT>Importar arquivos de request externas</INFO_TEXT>
      </RSMPE_FUNT>
     </FUN>
     <MEN>
@@ -1847,6 +1883,18 @@
       <NO>27</NO>
       <PFNO>07</PFNO>
      </RSMPE_BUT>
+     <RSMPE_BUT>
+      <PFK_CODE>000002</PFK_CODE>
+      <CODE>0001</CODE>
+      <NO>28</NO>
+      <PFNO>23</PFNO>
+     </RSMPE_BUT>
+     <RSMPE_BUT>
+      <PFK_CODE>000002</PFK_CODE>
+      <CODE>0001</CODE>
+      <NO>29</NO>
+      <PFNO>24</PFNO>
+     </RSMPE_BUT>
     </BUT>
     <PFK>
      <RSMPE_PFK>
@@ -2200,19 +2248,13 @@
      <RSMPE_PFK>
       <CODE>000002</CODE>
       <PFNO>23</PFNO>
-      <FUNCODE>&amp;VLOTUS</FUNCODE>
+      <FUNCODE>TR_EXPORT</FUNCODE>
       <FUNNO>001</FUNNO>
      </RSMPE_PFK>
      <RSMPE_PFK>
       <CODE>000002</CODE>
       <PFNO>24</PFNO>
-      <FUNCODE>&amp;VCRYSTAL</FUNCODE>
-      <FUNNO>001</FUNNO>
-     </RSMPE_PFK>
-     <RSMPE_PFK>
-      <CODE>000002</CODE>
-      <PFNO>25</PFNO>
-      <FUNCODE>&amp;ABC</FUNCODE>
+      <FUNCODE>TR_IMPORT</FUNCODE>
       <FUNNO>001</FUNNO>
      </RSMPE_PFK>
      <RSMPE_PFK>
@@ -2333,18 +2375,6 @@
       <CODE>000002</CODE>
       <PFNO>46</PFNO>
       <FUNCODE>&amp;RNT_PREV</FUNCODE>
-      <FUNNO>001</FUNNO>
-     </RSMPE_PFK>
-     <RSMPE_PFK>
-      <CODE>000002</CODE>
-      <PFNO>47</PFNO>
-      <FUNCODE>&amp;GRAPH</FUNCODE>
-      <FUNNO>001</FUNNO>
-     </RSMPE_PFK>
-     <RSMPE_PFK>
-      <CODE>000002</CODE>
-      <PFNO>48</PFNO>
-      <FUNCODE>&amp;VCRYSTAL</FUNCODE>
       <FUNNO>001</FUNNO>
      </RSMPE_PFK>
      <RSMPE_PFK>
@@ -2705,6 +2735,10 @@
      </RSMPE_STAF>
      <RSMPE_STAF>
       <STATUS>ALV_STATUS</STATUS>
+      <FUNCTION>DOWN_TR</FUNCTION>
+     </RSMPE_STAF>
+     <RSMPE_STAF>
+      <STATUS>ALV_STATUS</STATUS>
       <FUNCTION>DRUK</FUNCTION>
      </RSMPE_STAF>
      <RSMPE_STAF>
@@ -2849,6 +2883,18 @@
      </RSMPE_STAF>
      <RSMPE_STAF>
       <STATUS>ALV_STATUS</STATUS>
+      <FUNCTION>TR_EXPORT</FUNCTION>
+     </RSMPE_STAF>
+     <RSMPE_STAF>
+      <STATUS>ALV_STATUS</STATUS>
+      <FUNCTION>TR_IMPORT</FUNCTION>
+     </RSMPE_STAF>
+     <RSMPE_STAF>
+      <STATUS>ALV_STATUS</STATUS>
+      <FUNCTION>UPLOAD_TR</FUNCTION>
+     </RSMPE_STAF>
+     <RSMPE_STAF>
+      <STATUS>ALV_STATUS</STATUS>
       <FUNCTION>ZSUM</FUNCTION>
      </RSMPE_STAF>
     </SET>
@@ -2896,6 +2942,11 @@
    </CUA>
    <TPOOL>
     <item>
+     <ID>R</ID>
+     <ENTRY>Lista de status requests</ENTRY>
+     <LENGTH>24</LENGTH>
+    </item>
+    <item>
      <ID>I</ID>
      <KEY>001</KEY>
      <ENTRY>Lista de status de requests</ENTRY>
@@ -2906,6 +2957,48 @@
      <KEY>002</KEY>
      <ENTRY>Relatório de Requests</ENTRY>
      <LENGTH>42</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>014</KEY>
+     <ENTRY>Número total de registros selecionados:</ENTRY>
+     <LENGTH>78</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>015</KEY>
+     <ENTRY>Data de execução:</ENTRY>
+     <LENGTH>27</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>016</KEY>
+     <ENTRY>Usuário:</ENTRY>
+     <LENGTH>18</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>017</KEY>
+     <ENTRY>Sistema:</ENTRY>
+     <LENGTH>18</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>018</KEY>
+     <ENTRY>Nenhuma request selecionada</ENTRY>
+     <LENGTH>54</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>019</KEY>
+     <ENTRY>Download cancelado</ENTRY>
+     <LENGTH>30</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>020</KEY>
+     <ENTRY>Selecione uma pasta para baixar as requests</ENTRY>
+     <LENGTH>86</LENGTH>
     </item>
     <item>
      <ID>I</ID>
@@ -3003,12 +3096,127 @@
      <ENTRY>- Própria seleção -</ENTRY>
      <LENGTH>29</LENGTH>
     </item>
-    <item>
-     <ID>R</ID>
-     <ENTRY>Lista de status requests</ENTRY>
-     <LENGTH>24</LENGTH>
-    </item>
    </TPOOL>
+   <I18N_TPOOL>
+    <item>
+     <LANGUAGE>E</LANGUAGE>
+     <TEXTPOOL>
+      <item>
+       <ID>I</ID>
+       <KEY>001</KEY>
+       <ENTRY>Status of transport requests</ENTRY>
+       <LENGTH>54</LENGTH>
+      </item>
+      <item>
+       <ID>I</ID>
+       <KEY>002</KEY>
+       <ENTRY>Requests Report</ENTRY>
+       <LENGTH>42</LENGTH>
+      </item>
+      <item>
+       <ID>I</ID>
+       <KEY>F01</KEY>
+       <ENTRY>Standard selections</ENTRY>
+       <LENGTH>27</LENGTH>
+      </item>
+      <item>
+       <ID>I</ID>
+       <KEY>F02</KEY>
+       <ENTRY>Other selections</ENTRY>
+       <LENGTH>25</LENGTH>
+      </item>
+      <item>
+       <ID>I</ID>
+       <KEY>F03</KEY>
+       <ENTRY>Selections for transfers with package change</ENTRY>
+       <LENGTH>84</LENGTH>
+      </item>
+      <item>
+       <ID>I</ID>
+       <KEY>F04</KEY>
+       <ENTRY>Selections for package transfers</ENTRY>
+       <LENGTH>72</LENGTH>
+      </item>
+      <item>
+       <ID>I</ID>
+       <KEY>F05</KEY>
+       <ENTRY>Request type</ENTRY>
+       <LENGTH>23</LENGTH>
+      </item>
+      <item>
+       <ID>I</ID>
+       <KEY>F06</KEY>
+       <ENTRY>Request status</ENTRY>
+       <LENGTH>25</LENGTH>
+      </item>
+      <item>
+       <ID>I</ID>
+       <KEY>F07</KEY>
+       <ENTRY>Request attributes</ENTRY>
+       <LENGTH>25</LENGTH>
+      </item>
+      <item>
+       <ID>I</ID>
+       <KEY>F10</KEY>
+       <ENTRY>CTS Project</ENTRY>
+       <LENGTH>21</LENGTH>
+      </item>
+      <item>
+       <ID>I</ID>
+       <KEY>F11</KEY>
+       <ENTRY>Or</ENTRY>
+       <LENGTH>12</LENGTH>
+      </item>
+      <item>
+       <ID>I</ID>
+       <KEY>IC1</KEY>
+       <ENTRY>Expand</ENTRY>
+       <LENGTH>18</LENGTH>
+      </item>
+      <item>
+       <ID>I</ID>
+       <KEY>IC2</KEY>
+       <ENTRY>Compress</ENTRY>
+       <LENGTH>19</LENGTH>
+      </item>
+      <item>
+       <ID>I</ID>
+       <KEY>S11</KEY>
+       <ENTRY>Modifiable</ENTRY>
+       <LENGTH>21</LENGTH>
+      </item>
+      <item>
+       <ID>I</ID>
+       <KEY>S12</KEY>
+       <ENTRY>Released</ENTRY>
+       <LENGTH>18</LENGTH>
+      </item>
+      <item>
+       <ID>I</ID>
+       <KEY>S13</KEY>
+       <ENTRY>Release executed</ENTRY>
+       <LENGTH>29</LENGTH>
+      </item>
+      <item>
+       <ID>I</ID>
+       <KEY>X01</KEY>
+       <ENTRY>--- Nothing selected ---</ENTRY>
+       <LENGTH>48</LENGTH>
+      </item>
+      <item>
+       <ID>I</ID>
+       <KEY>X02</KEY>
+       <ENTRY>- Own selection -</ENTRY>
+       <LENGTH>29</LENGTH>
+      </item>
+      <item>
+       <ID>R</ID>
+       <ENTRY>Status of transport requests</ENTRY>
+       <LENGTH>70</LENGTH>
+      </item>
+     </TEXTPOOL>
+    </item>
+   </I18N_TPOOL>
   </asx:values>
  </asx:abap>
 </abapGit>

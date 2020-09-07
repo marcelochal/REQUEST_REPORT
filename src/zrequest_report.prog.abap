@@ -22,56 +22,118 @@ CLASS lcl_zrequest_report DEFINITION FINAL.
   PUBLIC SECTION.
     TYPES:
       BEGIN OF ty_s_alv,
-        trkorr       TYPE trkorr,
-        trfunction   TYPE e070-trfunction,
-        trfunctn_t   TYPE ko013-trfunctn_t,
-        client       TYPE trclient,
-        systemid     TYPE tarsystem,  " target system
-        rc           TYPE strw_int4,  " return code
-*        rc_icon      TYPE tp_icon,    " return code
-        rc_icon      TYPE icon_l4,    " return code
-        trstatus     TYPE trstatus,
-        trstatus_txt TYPE trstatus_t,
-        date         TYPE as4date,
-        time         TYPE as4time,
-        as4user      TYPE trheader-as4user,
-        as4text      TYPE as4text,
-        as4user_name TYPE ad_namtext,
-*        tarclient    TYPE e070c-tarclient,
-        as4date      TYPE trheader-as4date,
-        as4time      TYPE trheader-as4time,
-*        tardevcl     TYPE e070m-tardevcl,
-*        devclass     TYPE e070m-devclass,
-*        tarlayer     TYPE e070m-tarlayer,
+        trkorr       TYPE trkorr,           " Request/Task
+        trfunction   TYPE e070-trfunction,  " Type of request/task
+        trfunctn_t   TYPE ko013-trfunctn_t, " Type (short text)
+        client       TYPE trclient,         " Source client of request
+        systemid     TYPE tarsystem,        " target system
+        rc           TYPE strw_int4,        " return code
+        rc_icon      TYPE icon_l4,          " return code
+        trstatus     TYPE trstatus,         " Status of request/task
+        trstatus_txt TYPE trstatus_t,       " Status of request/task Text
+        date_step    TYPE as4date,          " Date Transport
+        time_step    TYPE as4time,          " Time Transport
+        as4user      TYPE trheader-as4user, " Owner of request/task
+        as4text      TYPE as4text,          " Short Description of Repository Objects
+        as4user_name TYPE ad_namtext,       " Full Name of Person
+*        tarclient    TYPE e070c-tarclient,  " Target client for the request
+        as4date      TYPE trheader-as4date, " Last Changed On
+        as4time      TYPE trheader-as4time, " Last changed at
+*        tardevcl     TYPE e070m-tardevcl,   " Target Package
+*        devclass     TYPE e070m-devclass,   " Package
+*        tarlayer     TYPE e070m-tarlayer,   " Target Transport Layer
       END OF ty_s_alv,
 
       ty_t_alv TYPE STANDARD TABLE OF ty_s_alv WITH KEY trkorr trfunction trfunctn_t systemid
                  WITH NON-UNIQUE SORTED KEY key1      COMPONENTS trkorr
-                 WITH NON-UNIQUE SORTED KEY sort_key1 COMPONENTS date time trkorr trfunction trfunctn_t systemid.
+                 WITH NON-UNIQUE SORTED KEY sort_key1 COMPONENTS date_step time_step trkorr trfunction trfunctn_t systemid,
+
+      BEGIN OF ty_s_default_path,
+        upload   TYPE string,
+        download TYPE string,
+      END OF ty_s_default_path.
+
+    TYPES: BEGIN OF ty_s_tmscsys,
+             alowed TYPE xfeld.
+        INCLUDE TYPE tmscsys.
+    TYPES END OF ty_s_tmscsys.
+
+    TYPES ty_t_sys TYPE STANDARD TABLE OF ty_s_tmscsys  WITH KEY alowed domnam sysnam limbo.
+
+    TYPES: BEGIN OF ty_s_conf,
+             invers     TYPE tcevers-version,   " memory input version
+             source     TYPE tcesyst-sysname,   " loaded systemconfig
+             domname    TYPE tmscdom-domnam,
+             trlayer    TYPE triwb_t_trlayer,   " transport layer
+             laytext    TYPE triwb_t_laytext,
+             system     TYPE triwb_t_system,
+             system2    TYPE triwb_t_dsysts,    " system list
+             systext    TYPE triwb_t_systext,
+             release    TYPE triwb_t_release,   " new integration control
+             deliver    TYPE triwb_t_deliver,   " deliveries
+             target     TYPE triwb_t_target,    " targets
+             tartext    TYPE triwb_t_tartext,
+             clientc    TYPE triwb_t_clientc,   " client control
+             dpltargets TYPE triwb_t_dpltarg,   " deploy targets
+             version    TYPE triwb_s_version,   " versions
+             vertext    TYPE triwb_t_vertext,
+             tms_conf   TYPE tmsmconf,
+             domains    TYPE tmscdom,
+           END OF ty_s_conf,
+
+           BEGIN OF ty_s_tr_files,
+             filename       TYPE string,
+             filetype       TYPE c LENGTH 1,
+             filepath       TYPE string,
+             server_path    TYPE eseiefile,
+             filelength_bin TYPE i,
+             header         TYPE xstring,
+             data_tab       TYPE esy_tt_rcgrepfile, "rcgrepfile.
+             text_buffer    TYPE string,
+             filelength_asc TYPE i,
+           END OF ty_s_tr_files,
+           ty_t_tr_files TYPE STANDARD TABLE OF ty_s_tr_files WITH KEY filename,
+           BEGIN OF ty_s_tr_import,
+             trkorr        TYPE trkorr,           " Request/Task
+             trfunction    TYPE e070-trfunction,  " Type of request/task
+             trfunctn_t    TYPE ko013-trfunctn_t, " Type (short text)
+             client        TYPE trclient,         " Source client of request
+             srcsystem     TYPE srcsystem,        " Original System of Object
+             tarsystem     TYPE tarsystem,        " target system
+             date_step     TYPE as4date,          " Date Transport
+             time_step     TYPE as4time,          " Time Transport
+             as4user       TYPE trheader-as4user, " Owner of request/task
+             t_tr_filedata TYPE ty_t_tr_files,
+           END OF ty_s_tr_import,
+
+           ty_t_tr_import  TYPE STANDARD TABLE OF ty_s_tr_import WITH KEY trkorr,
+           ty_t_file_table TYPE STANDARD TABLE OF file_info WITH DEFAULT KEY.
 
     CONSTANTS:
 *      cc_development_sys TYPE tarsystem VALUE 'S4D',
       cc_quality_sys    TYPE tarsystem VALUE 'S4Q',
       cc_production_sys TYPE tarsystem VALUE 'S4P',
-      BEGIN OF co_trstatus,
-        modifiable      TYPE trstatus VALUE 'D',    " D Modifiable
-        modifiable_prot TYPE trstatus VALUE 'L',    " L   Modifiable, Protected
-        release_started TYPE trstatus VALUE 'O',    " O   Release Started
-        released        TYPE trstatus VALUE 'R',    " R   Released
-        released_repair TYPE trstatus VALUE 'N',    " N   Released (with Import Protection for Repaired Objects)
-      END OF co_trstatus,
-      BEGIN OF co_trfunction,
+      BEGIN OF gc_trstatus,
+        modifiable      TYPE trstatus VALUE 'D',        " D Modifiable
+        modifiable_prot TYPE trstatus VALUE 'L',        " L Modifiable, Protected
+        release_started TYPE trstatus VALUE 'O',        " O Release Started
+        released        TYPE trstatus VALUE 'R',        " R Released
+        released_repair TYPE trstatus VALUE 'N',        " N Released (with Import Protection for Repaired Objects)
+      END OF gc_trstatus,
+
+      BEGIN OF gc_trfunction,
         customizing       TYPE trfunction VALUE 'W',    " W Customizing Request
         workbench         TYPE trfunction VALUE 'K',    " K Workbench Request
         transport_copies  TYPE trfunction VALUE 'T',    " T Transport of Copies
         relocation        TYPE trfunction VALUE 'C',    " C Relocation of Objects Without Package Change
         relocation_packch TYPE trfunction VALUE 'O',    " O Relocation of Objects with Package Change
         relocation_compl  TYPE trfunction VALUE 'E',    " E Relocation of complete package
-      END OF co_trfunction,
-      BEGIN OF co_task_function,
+      END OF gc_trfunction,
+
+      BEGIN OF gc_task_function,
         customizing       TYPE trfunction VALUE 'S',    " S   Development/Correction
         workbench         TYPE trfunction VALUE 'R',    " R   Repair
-        transport_copies  TYPE trfunction VALUE 'X',    " X   Unclassified Task
+        unclassified_task TYPE trfunction VALUE 'X',    " X   Unclassified Task
         relocation        TYPE trfunction VALUE 'Q',    " Q   Customizing Task
         relocation_packch TYPE trfunction VALUE 'G',    " G   Piece List for CTS Project
         relocation_compl  TYPE trfunction VALUE 'M',    " M   Client Transport Request
@@ -79,7 +141,22 @@ CLASS lcl_zrequest_report DEFINITION FINAL.
         pl_support_pack   TYPE trfunction VALUE 'D',    " D   Piece List for Support Package
         piece_list        TYPE trfunction VALUE 'F',    " F   Piece List
         deletion          TYPE trfunction VALUE 'L',    " L   Deletion transport
-      END OF co_task_function.
+      END OF gc_task_function,
+
+      BEGIN OF gc_tr_file,
+        data_path     TYPE c LENGTH 4 VALUE 'data',
+        data_prefix   TYPE c LENGTH 1 VALUE 'R',
+        cofiles_path  TYPE c LENGTH 7 VALUE 'cofiles',
+        cofile_prefix TYPE c LENGTH 1 VALUE 'K',
+      END OF gc_tr_file,
+
+      BEGIN OF gc_log_stepid,
+        import                TYPE trbatfunc VALUE 'I',
+        dictionary_activation TYPE trbatfunc VALUE 'A', " Dictionary Activation
+        import_ended          TYPE trbatfunc VALUE '!', " Import ended
+        waiting_qa_approval   TYPE trbatfunc VALUE 'p', " Request waiting for QA approval
+        qa_approval_given     TYPE trbatfunc VALUE 'q', " QA approval given
+      END OF gc_log_stepid.
 
     DATA:
       gt_alv       TYPE ty_t_alv.
@@ -102,16 +179,17 @@ CLASS lcl_zrequest_report DEFINITION FINAL.
   PRIVATE SECTION.
 
     DATA:
-      go_alv_table        TYPE REF TO cl_salv_table,
-      go_alv_layout       TYPE REF TO cl_salv_layout,
-      go_alv_top_of_list  TYPE REF TO cl_salv_form_layout_grid,
-      go_alv_flow_num_rec TYPE REF TO cl_salv_form_layout_flow,
-      go_alv_flow_date    TYPE REF TO cl_salv_form_layout_flow,
-      go_alv_selections   TYPE REF TO cl_salv_selections,
-      go_msg_ind          TYPE REF TO zcl_progress_indicator,
-      gt_requests         TYPE trwbo_request_headers,
-      gs_selection        TYPE trwbo_selection,
-      gs_ranges           TYPE trsel_ts_ranges.
+      go_alv_table       TYPE REF TO cl_salv_table,
+      go_alv_top_of_list TYPE REF TO cl_salv_form_layout_grid,
+*      go_alv_flow_num_rec TYPE REF TO cl_salv_form_layout_flow,
+*      go_alv_flow_date    TYPE REF TO cl_salv_form_layout_flow,
+      go_msg_ind         TYPE REF TO zcl_progress_indicator,
+      gt_requests        TYPE trwbo_request_headers,
+      gs_selection       TYPE trwbo_selection,
+      gs_ranges          TYPE trsel_ts_ranges,
+      gs_default_path    TYPE ty_s_default_path,
+      gt_sys             TYPE ty_t_sys,
+      gs_conf            TYPE ty_s_conf.
 
 *--------------------------------------------------------------------*
 *-------------        METHODS PRIVATE SECTION           -------------*
@@ -143,8 +221,30 @@ CLASS lcl_zrequest_report DEFINITION FINAL.
           ch_s_alv TYPE lcl_zrequest_report=>ty_s_alv,
       alv_set_columns,
       call_rddit076,
-      alv_create_header_and_footer.
-
+      tr_download,
+      tr_import,
+      file_upload_binary,
+      tr_import_upload_files
+        IMPORTING
+          im_v_filename        TYPE file_info-filename
+          im_v_selected_folder TYPE string
+        CHANGING
+          ch_s_tr_import       TYPE ty_s_tr_import,
+      tr_import_select_files
+        IMPORTING
+          im_t_file_table      TYPE ty_t_file_table
+          im_v_selected_folder TYPE string
+        CHANGING
+          ch_t_tr_import       TYPE ty_t_tr_import,
+      tr_import_save_files_on_unix
+        IMPORTING
+          im_t_tr_import TYPE ty_t_tr_import,
+      tr_import_zip_upload_files
+        IMPORTING
+          im_v_filename        TYPE file_info-filename
+          im_v_selected_folder TYPE string
+        CHANGING
+          ch_t_tr_import       TYPE ty_t_tr_import.
 
 ENDCLASS.
 
@@ -158,11 +258,68 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
 
   METHOD constructor.
 
-    CALL METHOD me->alv_create.
+    DATA: lt_sys             TYPE STANDARD TABLE OF tmscsys  WITH KEY domnam sysnam limbo.
 
-    CALL METHOD trint_select_requests.
+    " Read configuration from system
+    CALL FUNCTION 'TMS_CFG_READ_CONFIGURATION'
+      EXPORTING
+        iv_only_active = abap_true
+        iv_all_systems = abap_true
+      IMPORTING
+        es_conf        = gs_conf-tms_conf
+        es_dom         = gs_conf-domains
+      TABLES
+        tt_sys         = lt_sys           " System Description
+      EXCEPTIONS
+        OTHERS         = 12.
 
-    CALL METHOD me->alv_show.
+    IF sy-subrc NE 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+        WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+    CALL FUNCTION 'TRINT_TCE_READ_CONFIG'
+      EXPORTING
+        iv_language   = syst-langu
+      IMPORTING
+        et_vertext    = gs_conf-vertext
+        es_version    = gs_conf-version
+        et_system     = gs_conf-system
+        et_trlayer    = gs_conf-trlayer
+        et_release    = gs_conf-release
+        et_deliver    = gs_conf-deliver
+        et_systext    = gs_conf-systext
+        et_laytext    = gs_conf-laytext
+        et_tartext    = gs_conf-tartext
+        et_target     = gs_conf-target
+        et_clientc    = gs_conf-clientc
+        et_dpltargets = gs_conf-dpltargets
+      EXCEPTIONS
+        OTHERS        = 3.
+    IF sy-subrc NE 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+        WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+
+
+
+
+
+    MOVE-CORRESPONDING lt_sys TO me->gt_sys.
+
+    cl_gui_frontend_services=>get_upload_download_path(
+      CHANGING
+        upload_path                 = gs_default_path-upload    " Upload Path
+        download_path               = gs_default_path-download  " Download Path
+      EXCEPTIONS
+        OTHERS                      = 6               ).
+
+    me->alv_create(  ).
+
+    me->trint_select_requests(  ).
+
+    me->alv_show(  ).
 
   ENDMETHOD.
 
@@ -201,9 +358,8 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
         systemname = system_name
         systemtype = system_type.
 
-
-    gs_selection-reqfunctions       = 'CDEFGKLMOPTW'.
-    gs_selection-reqstatus          = 'DLONR'.
+    gs_selection-reqfunctions       = gc_trfunction.
+    gs_selection-reqstatus          = gc_trstatus.
     gs_selection-trkorrpattern(3)   = system_name(3).
     gs_selection-trkorrpattern+3(2) = 'K*'.
 
@@ -275,7 +431,9 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
         IMPORTING
           es_cofile = ls_cofile.
 
-      IF <fs_requests>-trstatus EQ co_trstatus-modifiable. "D  Modificável
+      IF <fs_requests>-trstatus   EQ gc_trstatus-modifiable OR "D  Modificável
+         <fs_requests>-trfunction CA gc_task_function .        " Task
+
         MOVE-CORRESPONDING:
             <fs_requests> TO ls_alv,
             ls_request-h  TO ls_alv.
@@ -283,37 +441,35 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
         ls_alv-systemid = sy-sysid.
         ls_alv-rc       = 99.
 
-        CALL METHOD me->alv_set_tr_text
-          CHANGING
-            ch_s_alv = ls_alv.
+        me->alv_set_tr_text( CHANGING ch_s_alv = ls_alv ).
 
         APPEND ls_alv TO me->gt_alv.
 
       ENDIF.
 
       LOOP AT ls_cofile-systems     ASSIGNING FIELD-SYMBOL(<fs_system>).
-        LOOP AT <fs_system>-steps   ASSIGNING FIELD-SYMBOL(<fs_step>). "WHERE clientid NE space. " step of transport
+        LOOP AT <fs_system>-steps   ASSIGNING FIELD-SYMBOL(<fs_step>) WHERE stepid EQ gc_log_stepid-import.
 
           ls_alv-client   = ls_request-h-client.
           ls_alv-systemid = <fs_system>-systemid.
           ls_alv-rc       = <fs_system>-rc.
 
           LOOP AT <fs_step>-actions ASSIGNING FIELD-SYMBOL(<fs_action>). " action
-            ls_alv-date = <fs_action>-date.
-            ls_alv-time = <fs_action>-time.
+            ls_alv-date_step = <fs_action>-date.
+            ls_alv-time_step = <fs_action>-time.
           ENDLOOP.
 
           MOVE-CORRESPONDING:
             <fs_requests> TO ls_alv,
             ls_request-h  TO ls_alv.
 
-          CALL METHOD me->alv_set_icon_type
-            CHANGING
-              ch_s_alv = ls_alv.
+          me->alv_set_icon_type(
+           CHANGING
+             ch_s_alv = ls_alv ).
 
-          CALL METHOD me->alv_set_tr_text
+          me->alv_set_tr_text(
             CHANGING
-              ch_s_alv = ls_alv.
+              ch_s_alv = ls_alv ).
 
           APPEND ls_alv TO me->gt_alv.
 
@@ -323,10 +479,10 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
 
     DELETE ADJACENT DUPLICATES FROM me->gt_alv COMPARING trkorr systemid.
 
-    CALL METHOD delete_system_not_final EXPORTING im_v_system = me->cc_production_sys.
-    CALL METHOD delete_system_not_final EXPORTING im_v_system = me->cc_quality_sys.
+    me->delete_system_not_final( me->cc_production_sys ).
+    me->delete_system_not_final( me->cc_quality_sys ).
 
-    SORT me->gt_alv  DESCENDING BY date time .
+    SORT me->gt_alv  DESCENDING BY date_step time_step .
 
 
   ENDMETHOD.
@@ -350,22 +506,39 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
 
 
   METHOD alv_show.
+    DATA:
+      lo_logo              TYPE REF TO cl_salv_form_layout_logo.
 
-    CLEAR: go_alv_flow_date, go_alv_flow_num_rec.
+    go_alv_top_of_list->create_flow( row = 1 column  = 1 )->create_label( text = 'Sistema:'(017) ).
+    go_alv_top_of_list->create_flow( row = 1 column  = 2 )->create_text(  text = |{ syst-sysid } { syst-mandt }| ).
 
-    go_alv_flow_date = go_alv_top_of_list->create_flow( row = 2 column  = 1 ).
-    go_alv_flow_num_rec = go_alv_top_of_list->create_flow( row = 3 column  = 1 ).
-    go_alv_flow_date->create_text(    text = |Data de execução: { sy-datlo DATE = USER } { syst-uzeit TIME = USER }| ).
-    go_alv_flow_num_rec->create_text( text = 'Número total de registros selecionados: ' && |{ lines( me->gt_alv ) }| ).
+    go_alv_top_of_list->create_flow( row = 2 column  = 1 )->create_label( text = 'Usuário:'(016) ).
+    go_alv_top_of_list->create_flow( row = 2 column  = 2 )->create_text(  text = |{ syst-uname }| ).
 
-    CALL METHOD me->go_alv_table->display.
+    go_alv_top_of_list->create_flow( row = 3 column  = 1 )->create_label( text = |{ 'Data de execução:'(015) }| ).
+    go_alv_top_of_list->create_flow( row = 3 column  = 2 )->create_text(  text = |{ sy-datlo DATE = USER } { syst-uzeit TIME = USER }| ).
 
-    CALL METHOD me->user_command( syst-ucomm ).
+    go_alv_top_of_list->create_flow( row = 4 column  = 1 )->create_label( text = 'Número total de registros selecionados: '(014) ).
+    go_alv_top_of_list->create_flow( row = 4 column  = 2 )->create_text(  text = lines( me->gt_alv ) ).
+
+    CREATE OBJECT lo_logo.
+
+* set left content
+    lo_logo->set_left_content( go_alv_top_of_list ).
+
+* set Right Image
+    lo_logo->set_right_logo( 'ZTAESA_LOGO_ALV' ).
+
+*   set the top of list using the header for Online.
+    me->go_alv_table->set_top_of_list( lo_logo ).
+
+    me->go_alv_table->display(  ).
+    me->user_command( syst-ucomm ).
 
   ENDMETHOD.
 
   METHOD on_alv_user_command.
-    CALL METHOD me->user_command( e_salv_function ).
+    me->user_command( e_salv_function ).
   ENDMETHOD.
 
   METHOD user_command.
@@ -385,12 +558,17 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
         LEAVE PROGRAM.
 
       WHEN 'REFRESH'.
-        CALL METHOD:
-            me->trint_select_requests( im_v_refresh = abap_on ),
-            me->go_alv_table->refresh.
+        me->trint_select_requests( im_v_refresh = abap_on ).
+        me->go_alv_table->refresh(  ).
 
       WHEN 'RDDIT076'.
-        CALL METHOD me->call_rddit076( ).
+        me->call_rddit076( ).
+
+      WHEN 'TR_EXPORT'.
+        me->tr_download( ).
+
+      WHEN 'TR_IMPORT'.
+        me->tr_import( ).
 
     ENDCASE.
 
@@ -609,6 +787,13 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
               lo_alv_colum->set_ddic_reference( ls_ddic_reference ).
 *              lo_alv_colum->set_output_length( 10 ).
 
+            WHEN 'date'.
+              lo_alv_colum->set_cell_type( if_salv_c_cell_type=>hotspot ).
+              lo_alv_colum->set_long_text( 'Log Erro' ).
+              lo_alv_colum->set_medium_text( 'Log Erro' ).
+              lo_alv_colum->set_short_text( 'Log Erro' ).
+
+
 *            WHEN 'AS4USER'.
 *              lo_alv_colum->set_optimized( abap_false ).
 *              lo_alv_colum->set_output_length( 10 ).
@@ -659,67 +844,609 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD alv_create_header_and_footer .
+  METHOD tr_download.
+
     DATA:
-*          lr_top_element TYPE REF TO cl_salv_form_layout_grid,
-      lr_end_element TYPE REF TO cl_salv_form_layout_flow,
-      lr_grid        TYPE REF TO cl_salv_form_layout_grid,
-*          lr_header      TYPE REF TO cl_salv_form_header_info,
-      lr_action      TYPE REF TO cl_salv_form_action_info,
-      lr_textview1   TYPE REF TO cl_salv_form_text,
-      lr_picture     TYPE REF TO cl_salv_form_picture,
-      lr_label       TYPE REF TO cl_salv_form_label.
+      lt_rows            TYPE salv_t_row,
+      lv_dir_trans       TYPE char255,
+      lv_selected_folder TYPE string,
+      lv_window_title    TYPE string,
+      lb_check_dir       TYPE abap_bool,
+      lv_server_path     TYPE sapb-sappfad,
+      lv_targetpath      TYPE sapb-sappfad,
+      lv_tr_filename     TYPE string.
 
-    TRY.
-        " Header Top Of Page
-*    lr_label = go_alv_top_of_list->create_label( row = 1 column  = 1 ).
-*    lr_label->set_text( value =  ).
+    lt_rows  = me->go_alv_table->get_selections( )->get_selected_rows( ).
 
-        CREATE OBJECT go_alv_top_of_list
+    IF lt_rows IS INITIAL.
+      MESSAGE 'No requests selected'(018) TYPE 'S' DISPLAY LIKE 'E'.
+      RETURN.
+    ENDIF.
+
+    " Get default path for requests /usr/sap/trans
+    CALL 'C_SAPGPARAM' ID 'NAME' FIELD 'DIR_TRANS' ID 'VALUE' FIELD lv_dir_trans.
+
+    lv_selected_folder = me->gs_default_path-download.
+    lv_window_title = 'Select a folder to download requests'(020).
+
+    cl_gui_frontend_services=>directory_browse(
+      EXPORTING
+        window_title         = lv_window_title      " Title of Browsing Window
+        initial_folder       = lv_selected_folder   " Start Browsing Here
+      CHANGING
+        selected_folder      = lv_selected_folder   " Folder Selected By User
+      EXCEPTIONS
+        OTHERS               = 4   ).
+
+    IF syst-subrc IS NOT INITIAL.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+      RETURN.
+    ENDIF.
+
+    IF lv_selected_folder IS INITIAL.
+      MESSAGE 'Download canceled'(019) TYPE 'S' DISPLAY LIKE 'E'.
+      RETURN.
+    ENDIF.
+
+    cl_gui_frontend_services=>directory_exist(
+      EXPORTING
+        directory            = lv_selected_folder   " Directory name
+      RECEIVING
+        result               = lb_check_dir         " Result
+      EXCEPTIONS
+        OTHERS               = 5    ).
+    IF sy-subrc IS NOT INITIAL OR lb_check_dir NE abap_true.
+      MESSAGE ID sy-msgid TYPE 'S' NUMBER sy-msgno
+        WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 DISPLAY LIKE 'E'.
+      RETURN.
+    ENDIF.
+
+    LOOP AT lt_rows ASSIGNING FIELD-SYMBOL(<row>).
+      READ TABLE me->gt_alv ASSIGNING FIELD-SYMBOL(<alv>) INDEX <row>.
+
+      IF  <alv>-trstatus NE gc_trstatus-released.
+        MESSAGE ID 'TR' TYPE 'I' NUMBER 492 WITH <alv>-trkorr. "  Request &1 has not been released
+        EXIT FROM STEP-LOOP.
+      ENDIF.
+
+      DO 2 TIMES.
+
+        lv_tr_filename      = |{ <alv>-trkorr+4(6) }.{ <alv>-trkorr(3) }|.
+
+        IF syst-index EQ 1.
+          lv_server_path    =    gc_tr_file-data_path.
+          lv_tr_filename    = |{ gc_tr_file-data_prefix }{ lv_tr_filename }|.   " R908261.SHD
+        ELSE.
+          lv_server_path    =    gc_tr_file-cofiles_path.
+          lv_tr_filename    = |{ gc_tr_file-cofile_prefix }{ lv_tr_filename }|. " K908261.SHD
+        ENDIF.
+
+        lv_server_path      = |{ lv_dir_trans }/{ lv_server_path }/{ lv_tr_filename }|.
+
+        lv_targetpath       = |{ lv_selected_folder }\\{ <alv>-trkorr }\\{ lv_tr_filename }|.
+
+        CALL FUNCTION 'ARCHIVFILE_SERVER_TO_CLIENT'
           EXPORTING
-            columns = 2.
+            path       = lv_server_path
+            targetpath = lv_targetpath
+          EXCEPTIONS
+            OTHERS     = 2.
 
-        go_alv_top_of_list->create_header_information(
-          EXPORTING
-            row     = 1                 " Natural Number
-            column  = 1                 " Natural Number
-            text    = 'Relatório de Requests'(002)
-            tooltip = 'Relatório de Requests'(002)   ).
-
-
-        lr_grid = go_alv_top_of_list->create_grid( row    = 3
-                                                   column = 1 ).
-
-
-        lr_textview1 = lr_grid->create_text(
-            row     = 1
-            column  = 1
-            text    = 'teste texto Row 1 Coluna 1'
-            tooltip = 'Tooltip' ).
-
-
-        CREATE OBJECT lr_picture
-          EXPORTING
-            picture_id = 'Z_SAPGUI_MC_001.PNG'.
-
-        CALL METHOD lr_grid->set_element
-          EXPORTING
-            row       = 4
-            column    = 1
-            r_element = lr_picture.
-
-        me->go_alv_table->set_top_of_list( value = go_alv_top_of_list ).
-
-*    DATA: lr_eol TYPE REF TO cl_salv_form_header_info.
-*    CREATE OBJECT lr_eol
-*      EXPORTING
-*        text = 'This is my Footer'.
-*
-*    me->go_alv_table->set_end_of_list( lr_eol ).
-
-      CATCH cx_root INTO DATA(lcx_root).
-        MESSAGE lcx_root->get_text( ) TYPE 'E'.
-    ENDTRY.
+        IF sy-subrc NE 0.
+          MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                  WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+          EXIT. " exit do
+        ENDIF.
+      ENDDO.
+    ENDLOOP.
 
   ENDMETHOD.
+
+  METHOD tr_import.
+
+    CONSTANTS: lc_fileformat_binary TYPE rlgrap-filetype VALUE 'BIN'.
+
+    DATA:
+      lv_selected_folder TYPE string,
+      lv_sub_folder      TYPE string,
+      lv_upload_path     TYPE string,
+      lv_window_title    TYPE string,
+      lt_file_table      TYPE STANDARD TABLE OF file_info WITH DEFAULT KEY,
+      lt_sub_file_table  TYPE STANDARD TABLE OF file_info WITH DEFAULT KEY,
+      lv_file_count      TYPE i,
+      lt_tr_import       TYPE STANDARD TABLE OF ty_s_tr_import WITH KEY trkorr,
+      lo_alv_table       TYPE REF TO cl_salv_table.
+
+    lv_upload_path  = me->gs_default_path-upload.
+    lv_window_title = 'Select a folder to upload requests'(020).
+
+    cl_gui_frontend_services=>directory_browse(
+      EXPORTING
+        window_title         = lv_window_title      " Title of Browsing Window
+        initial_folder       = lv_upload_path       " Start Browsing Here
+      CHANGING
+        selected_folder      = lv_selected_folder   " Folder Selected By User
+      EXCEPTIONS
+        OTHERS               = 4   ).
+
+    IF syst-subrc IS NOT INITIAL.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+      RETURN.
+    ENDIF.
+
+    IF lv_selected_folder IS INITIAL.
+      MESSAGE 'Upload canceled' TYPE 'S' DISPLAY LIKE 'E'.
+      RETURN.
+    ENDIF.
+
+    cl_gui_frontend_services=>directory_list_files(
+      EXPORTING
+        directory                   = lv_selected_folder    " Directory To Search
+      CHANGING
+        file_table                  = lt_file_table         " Return Table for the Found Files
+        count                       = lv_file_count         " Number of Files/Dir Found
+      EXCEPTIONS
+        OTHERS                      = 6    ).
+
+    IF sy-subrc IS NOT INITIAL.
+      MESSAGE ID sy-msgid TYPE 'S' NUMBER sy-msgno
+        WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 DISPLAY LIKE 'E'.
+      RETURN.
+    ENDIF.
+
+
+    " Pergunta se deve procurar em subpastas, se for encontrado
+    READ TABLE lt_file_table WITH KEY isdir = '1' BINARY SEARCH TRANSPORTING NO FIELDS.
+    IF syst-subrc IS INITIAL.
+      " tratamento aqui!
+    ENDIF.
+
+    me->tr_import_select_files(
+        EXPORTING
+            im_t_file_table      = lt_file_table
+            im_v_selected_folder = lv_selected_folder
+        CHANGING
+            ch_t_tr_import = lt_tr_import ).
+
+
+    LOOP AT lt_file_table ASSIGNING FIELD-SYMBOL(<ls_file_table>) WHERE isdir EQ '1'.
+
+      CLEAR: lt_sub_file_table, lv_sub_folder.
+
+      lv_sub_folder  = |{ lv_selected_folder }\\{ <ls_file_table>-filename }|.
+
+      cl_gui_frontend_services=>directory_list_files(
+           EXPORTING
+             directory                   = lv_sub_folder
+           CHANGING
+             file_table                  = lt_sub_file_table     " Return Table for the Found Files
+             count                       = lv_file_count         " Number of Files/Dir Found
+           EXCEPTIONS
+             OTHERS                      = 6    ).
+
+      me->tr_import_select_files(
+          EXPORTING
+              im_t_file_table      = lt_sub_file_table
+              im_v_selected_folder = lv_sub_folder
+          CHANGING
+              ch_t_tr_import = lt_tr_import ).
+
+    ENDLOOP.
+
+    DATA:
+      ls_layout_key TYPE salv_s_layout_key.
+
+    TRY.
+
+        " Create object ALV TABLE
+        CALL METHOD cl_salv_table=>factory
+          IMPORTING
+            r_salv_table = lo_alv_table " Basis Class Simple ALV Tables
+          CHANGING
+            t_table      = lt_tr_import.
+
+*        CALL METHOD me->go_alv_table->set_screen_status
+*          EXPORTING
+*            report        = syst-repid                          " ABAP Program: Current Master Program
+*            pfstatus      = 'ALV_STATUS'                        " Screens, Current GUI Status
+*            set_functions = me->go_alv_table->c_functions_all.  " ALV: Data Element for Constants
+
+        lo_alv_table->get_functions( )->set_all( abap_true ).
+
+        " Set Display Settings
+        lo_alv_table->get_display_settings( )->set_horizontal_lines( abap_true ).
+        lo_alv_table->get_display_settings( )->set_striped_pattern( abap_true ).
+
+        " Set Functional Settings
+        lo_alv_table->get_functional_settings( )->set_sort_on_header_click( abap_true ).
+
+        " Set Selections Type
+        lo_alv_table->get_selections( )->set_selection_mode( if_salv_c_selection_mode=>row_column ).
+
+        " Set Columns Parameters
+        me->alv_set_columns( ).
+
+        " Set Layout
+        ls_layout_key-report = sy-repid.
+        lo_alv_table->get_layout( )->set_key( ls_layout_key ).
+        lo_alv_table->get_layout( )->set_save_restriction( if_salv_c_layout=>restrict_none ).
+
+
+        lo_alv_table->set_screen_popup(
+          EXPORTING
+            start_column = 1
+            end_column   = 100
+            start_line   = 1
+            end_line     = lines( lt_tr_import ) + 2 ).
+
+        lo_alv_table->display( ).
+
+
+      CATCH cx_root INTO DATA(lcx_root).
+        " Deu ruim!
+        MESSAGE lcx_root->get_longtext( ) TYPE 'E'.
+
+    ENDTRY.
+
+    me->tr_import_save_files_on_unix( im_t_tr_import = lt_tr_import ).
+
+  ENDMETHOD.
+
+  METHOD file_upload_binary.
+
+  ENDMETHOD.
+
+
+  METHOD tr_import_upload_files.
+
+    CONSTANTS: lc_fileformat_binary TYPE rlgrap-filetype VALUE 'BIN'.
+
+    DATA:
+      lv_filename  TYPE string VALUE space,
+      lv_srcsystem TYPE srcsystem,        " Original System of Object
+      lv_trkorr    TYPE trkorr,
+      lv_dir_trans TYPE char255.
+
+    " Get default path for requests /usr/sap/trans
+    CALL 'C_SAPGPARAM' ID 'NAME' FIELD 'DIR_TRANS' ID 'VALUE' FIELD lv_dir_trans.
+
+    SPLIT im_v_filename AT '.' INTO lv_trkorr lv_srcsystem.
+
+    ch_s_tr_import-trkorr = |{ lv_srcsystem }{ lv_trkorr }|.
+
+    DO 2 TIMES.
+
+      APPEND INITIAL LINE TO ch_s_tr_import-t_tr_filedata ASSIGNING FIELD-SYMBOL(<ls_tr_filedata>).
+      lv_filename = im_v_filename.
+      <ls_tr_filedata>-filetype     = gc_tr_file-cofile_prefix.
+      <ls_tr_filedata>-server_path  = |{ lv_dir_trans }/{ gc_tr_file-cofiles_path }/{ lv_filename }|.
+
+      IF syst-index EQ '2'.
+        " Replace K for R, change COFILE for DATA request file
+        REPLACE me->gc_tr_file-cofile_prefix IN lv_filename WITH me->gc_tr_file-data_prefix.
+        <ls_tr_filedata>-filetype       = gc_tr_file-data_prefix.
+        <ls_tr_filedata>-server_path    = |{ lv_dir_trans }/{ gc_tr_file-data_path }/{ lv_filename }|.
+      ENDIF.
+
+      <ls_tr_filedata>-filename  = lv_filename.
+      <ls_tr_filedata>-filepath  = im_v_selected_folder.
+      lv_filename                = |{ im_v_selected_folder }{ lv_filename }|.
+
+      cl_gui_frontend_services=>gui_upload(
+        EXPORTING
+          filename                = lv_filename                     " Name of file
+          filetype                = |{ lc_fileformat_binary }|      " File Type (ASCII, Binary)
+        IMPORTING
+          filelength              = <ls_tr_filedata>-filelength_bin " File Length
+          header                  = <ls_tr_filedata>-header         " File Header in Case of Binary Upload
+        CHANGING
+          data_tab                = <ls_tr_filedata>-data_tab       " Transfer table for file contents
+        EXCEPTIONS
+          OTHERS                  = 19       ).
+      IF sy-subrc NE 0.
+        MESSAGE ID sy-msgid TYPE 'S' NUMBER sy-msgno
+          WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+        RETURN.
+      ENDIF.
+
+      IF syst-index EQ '1'.
+        CALL FUNCTION 'SCMS_BINARY_TO_STRING'
+          EXPORTING
+            input_length  = <ls_tr_filedata>-filelength_bin
+          IMPORTING
+            text_buffer   = <ls_tr_filedata>-text_buffer
+            output_length = <ls_tr_filedata>-filelength_asc
+          TABLES
+            binary_tab    = <ls_tr_filedata>-data_tab
+          EXCEPTIONS
+            OTHERS        = 2.
+        IF sy-subrc NE 0.
+          MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+        ENDIF.
+
+        ch_s_tr_import-as4user    = <ls_tr_filedata>-text_buffer(12).
+        ch_s_tr_import-trfunction = <ls_tr_filedata>-text_buffer+13(1).
+        ch_s_tr_import-tarsystem  = <ls_tr_filedata>-text_buffer+15(10).
+
+        SPLIT <ls_tr_filedata>-text_buffer AT cl_abap_char_utilities=>newline INTO TABLE DATA(lt_segments).
+
+        " Get Line 4 with log start
+        ASSIGN lt_segments[ 4 ] TO FIELD-SYMBOL(<ls_segments>).
+
+        " Get Source System
+        ch_s_tr_import-srcsystem = <ls_segments>(3).
+
+        " Split line to get timestemp
+        SPLIT <ls_segments> AT space INTO TABLE DATA(lt_log_line_segments).
+
+        ASSIGN lt_log_line_segments[ 4 ] TO FIELD-SYMBOL(<ls_log_line_segments>).
+
+        ch_s_tr_import-date_step = <ls_log_line_segments>(8).
+        ch_s_tr_import-time_step = <ls_log_line_segments>+8(6).
+
+      ENDIF.
+
+    ENDDO.
+
+  ENDMETHOD.
+
+  METHOD tr_import_zip_upload_files.
+
+    CONSTANTS: lc_fileformat_binary TYPE rlgrap-filetype VALUE 'BIN'.
+
+    DATA:
+      lv_filename  TYPE string VALUE space,
+      lv_srcsystem TYPE srcsystem,        " Original System of Object
+      lv_trkorr    TYPE trkorr,
+      lv_dir_trans TYPE char255,
+      lv_xhead     TYPE xstring,
+      lv_content   TYPE xstring,
+      lo_zip       TYPE REF TO cl_abap_zip.
+
+    " Get default path for requests /usr/sap/trans
+    CALL 'C_SAPGPARAM' ID 'NAME' FIELD 'DIR_TRANS' ID 'VALUE' FIELD lv_dir_trans.
+
+    " Get File Type
+    FIND ALL OCCURRENCES OF '.'
+      IN im_v_filename
+      IN CHARACTER MODE
+      MATCH OFFSET DATA(lv_moff).
+
+    CREATE OBJECT lo_zip.
+
+    APPEND INITIAL LINE TO ch_t_tr_import               ASSIGNING FIELD-SYMBOL(<ls_tr_import>).
+    APPEND INITIAL LINE TO <ls_tr_import>-t_tr_filedata ASSIGNING FIELD-SYMBOL(<ls_tr_filedata>).
+
+    lv_filename = im_v_filename.
+
+    <ls_tr_filedata>-filename  = lv_filename.
+    <ls_tr_filedata>-filepath  = im_v_selected_folder.
+    lv_filename                = |{ im_v_selected_folder }{ lv_filename }|.
+
+    cl_gui_frontend_services=>gui_upload(
+      EXPORTING
+        filename                = lv_filename                     " Name of file
+        filetype                = |{ lc_fileformat_binary }|      " File Type (ASCII, Binary)
+      IMPORTING
+        filelength              = <ls_tr_filedata>-filelength_bin " File Length
+        header                  = <ls_tr_filedata>-header         " File Header in Case of Binary Upload
+      CHANGING
+        data_tab                = <ls_tr_filedata>-data_tab       " Transfer table for file contents
+      EXCEPTIONS
+        OTHERS                  = 19       ).
+    IF sy-subrc NE 0.
+      MESSAGE ID sy-msgid TYPE 'S' NUMBER sy-msgno
+        WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+      RETURN.
+    ENDIF.
+
+    CALL FUNCTION 'SCMS_BINARY_TO_XSTRING'
+      EXPORTING
+        input_length = <ls_tr_filedata>-filelength_bin
+      IMPORTING
+        buffer       = lv_xhead
+      TABLES
+        binary_tab   = <ls_tr_filedata>-data_tab
+      EXCEPTIONS
+        OTHERS       = 2.
+    IF sy-subrc NE 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+            WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+    lo_zip->load( lv_xhead ).
+
+    LOOP AT lo_zip->files ASSIGNING FIELD-SYMBOL(<ls_zip_file>).
+
+      IF <ls_zip_file>-name(1) NE gc_tr_file-cofile_prefix. " K
+        EXIT.
+      ENDIF.
+
+      SPLIT <ls_zip_file>-name AT '.' INTO lv_trkorr lv_srcsystem.
+      <ls_tr_import>-trkorr = |{ lv_srcsystem }{ lv_trkorr }|.
+
+      DO 2 TIMES.
+
+        lv_filename                   = <ls_zip_file>-name.
+        <ls_tr_filedata>-filetype     = gc_tr_file-cofile_prefix.   " K
+        <ls_tr_filedata>-server_path  = |{ lv_dir_trans }/{ gc_tr_file-cofiles_path }/{ lv_filename }|.
+
+        IF syst-index EQ '2'.
+          APPEND INITIAL LINE TO <ls_tr_import>-t_tr_filedata ASSIGNING <ls_tr_filedata>.
+          " Replace K for R, change COFILE for DATA request file
+          REPLACE me->gc_tr_file-cofile_prefix IN lv_filename WITH me->gc_tr_file-data_prefix.
+          <ls_tr_filedata>-filetype       = gc_tr_file-data_prefix.
+          <ls_tr_filedata>-server_path    = |{ lv_dir_trans }/{ gc_tr_file-data_path }/{ lv_filename }|.
+        ENDIF.
+
+        lo_zip->get(
+          EXPORTING
+          name                      = lv_filename   " Name (Case-Sensitive)
+          IMPORTING
+            content                 = lv_content    " Contents
+          EXCEPTIONS
+            OTHERS                  = 3           ).
+        IF sy-subrc NE 0.
+          MESSAGE ID sy-msgid TYPE 'S' NUMBER sy-msgno
+            WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+          RETURN.
+        ENDIF.
+
+        CALL FUNCTION 'SCMS_XSTRING_TO_BINARY'
+          EXPORTING
+            buffer        = lv_content
+          IMPORTING
+            output_length = <ls_tr_filedata>-filelength_bin
+          TABLES
+            binary_tab    = <ls_tr_filedata>-data_tab.
+
+
+        IF syst-index EQ '1'.
+          CALL FUNCTION 'SCMS_BINARY_TO_STRING'
+            EXPORTING
+              input_length  = <ls_tr_filedata>-filelength_bin
+            IMPORTING
+              text_buffer   = <ls_tr_filedata>-text_buffer
+              output_length = <ls_tr_filedata>-filelength_asc
+            TABLES
+              binary_tab    = <ls_tr_filedata>-data_tab
+            EXCEPTIONS
+              OTHERS        = 2.
+          IF sy-subrc NE 0.
+            MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                  WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+          ENDIF.
+
+          <ls_tr_import>-as4user    = <ls_tr_filedata>-text_buffer(12).
+          <ls_tr_import>-trfunction = <ls_tr_filedata>-text_buffer+13(1).
+          <ls_tr_import>-tarsystem  = <ls_tr_filedata>-text_buffer+15(10).
+
+          SPLIT <ls_tr_filedata>-text_buffer AT cl_abap_char_utilities=>newline INTO TABLE DATA(lt_segments).
+
+          " Get Line 4 with log start
+          ASSIGN lt_segments[ 4 ] TO FIELD-SYMBOL(<ls_segments>).
+
+          " Get Source System
+          <ls_tr_import>-srcsystem = <ls_segments>(3).
+
+          " Split line to get timestemp
+          SPLIT <ls_segments> AT space INTO TABLE DATA(lt_log_line_segments).
+
+          ASSIGN lt_log_line_segments[ 4 ] TO FIELD-SYMBOL(<ls_log_line_segments>).
+
+          <ls_tr_import>-date_step = <ls_log_line_segments>(8).
+          <ls_tr_import>-time_step = <ls_log_line_segments>+8(6).
+
+        ENDIF.
+
+
+      ENDDO.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD tr_import_select_files.
+    DATA: lv_selected_folder TYPE string.
+
+    lv_selected_folder = |{ im_v_selected_folder }\\|. " Insert \ at last
+
+    LOOP AT im_t_file_table ASSIGNING FIELD-SYMBOL(<ls_file_info>) WHERE isdir       NE '1' AND
+                                                                         filename(1) EQ gc_tr_file-cofile_prefix. " K
+      APPEND INITIAL LINE TO ch_t_tr_import ASSIGNING FIELD-SYMBOL(<ls_tr_import>).
+
+      me->tr_import_upload_files(
+          EXPORTING
+            im_v_filename        = <ls_file_info>-filename
+            im_v_selected_folder = lv_selected_folder
+          CHANGING
+            ch_s_tr_import       = <ls_tr_import> ).
+
+    ENDLOOP.
+
+    LOOP AT im_t_file_table ASSIGNING <ls_file_info> WHERE isdir    NE '1' AND
+                                                        filename    CS '.ZIP'.
+
+      me->tr_import_zip_upload_files(
+          EXPORTING
+            im_v_filename        = <ls_file_info>-filename
+            im_v_selected_folder = lv_selected_folder
+          CHANGING
+            ch_t_tr_import       = ch_t_tr_import ).
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD tr_import_save_files_on_unix.
+
+    DATA:
+      lv_lines         TYPE i,
+      lv_dir_trans     TYPE char255,
+      lv_max_len       TYPE i  VALUE 2550,
+      lv_filename      TYPE authb-filename,
+      lv_len           TYPE i,
+      lv_all_lines_len TYPE i,
+      lv_diff_len      TYPE i.
+
+
+    LOOP AT im_t_tr_import ASSIGNING FIELD-SYMBOL(<ls_tr_import>).
+      LOOP AT <ls_tr_import>-t_tr_filedata ASSIGNING FIELD-SYMBOL(<ls_tr_filedata>).
+
+* count lines in rawdata table
+        DESCRIBE TABLE <ls_tr_filedata>-data_tab LINES lv_lines.
+
+        lv_filename = <ls_tr_filedata>-server_path.
+
+* open dataset for writing
+
+        CATCH SYSTEM-EXCEPTIONS open_dataset_no_authority = 1
+                                dataset_too_many_files = 2
+                                OTHERS = 4.
+          OPEN DATASET <ls_tr_filedata>-server_path FOR OUTPUT IN BINARY MODE.
+        ENDCATCH.
+
+        IF sy-subrc IS NOT INITIAL.
+*          RAISE open_failed.
+        ELSE.
+
+          lv_len = lv_max_len.
+
+          LOOP AT <ls_tr_filedata>-data_tab ASSIGNING FIELD-SYMBOL(<ls_data_tab>).
+*     last line is shorter perhaps
+            IF sy-tabix = lv_lines.
+              lv_all_lines_len   = lv_max_len * ( lv_lines - 1 ).
+              lv_diff_len       = <ls_tr_filedata>-filelength_bin - lv_all_lines_len.
+              lv_len            = lv_diff_len.
+            ENDIF.
+
+*     write data in file
+            CATCH SYSTEM-EXCEPTIONS dataset_write_error = 1
+                                                 OTHERS = 4.
+              TRANSFER <ls_data_tab> TO <ls_tr_filedata>-server_path LENGTH lv_len.
+            ENDCATCH.
+            IF sy-subrc IS NOT INITIAL.
+*              RAISE write_failed.
+            ENDIF.
+          ENDLOOP.
+        ENDIF.
+
+* close the dataset
+        CATCH SYSTEM-EXCEPTIONS dataset_cant_close = 1
+                                OTHERS = 4.
+          CLOSE DATASET <ls_tr_filedata>-server_path.
+        ENDCATCH.
+
+        IF sy-subrc IS NOT INITIAL.
+*          RAISE close_failed.
+        ENDIF.
+
+      ENDLOOP.
+    ENDLOOP.
+
+
+  ENDMETHOD.
+
 ENDCLASS.
