@@ -815,7 +815,7 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
         lo_alv_columns ?= me->go_alv_table->get_columns( ).
         lo_alv_columns->set_optimize( abap_true ).
 
-        zcl_utils=>get_field_list(
+        me->get_field_list(
           EXPORTING
             im_t_table      = me->gt_alv
           IMPORTING
@@ -862,11 +862,6 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
               lo_alv_colum->set_medium_text( 'Log Erro' ).
               lo_alv_colum->set_short_text( 'Log Erro' ).
 
-
-*            WHEN 'AS4USER'.
-*              lo_alv_colum->set_optimized( abap_false ).
-*              lo_alv_colum->set_output_length( 10 ).
-
             WHEN 'AS4USER_NAME' OR 'AS4TEXT'.
               lo_alv_colum->set_alignment( value = if_salv_c_alignment=>left ).
 
@@ -890,14 +885,6 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
       lr_data       TYPE REF TO data.
 
     TRY.
-*    im_s_struc      TYPE any            OPTIONAL
-*        !im_t_table      TYPE STANDARD TABLE OPTIONAL
-*          PREFERRED PARAMETER im_r_data
-*      EXPORTING
-*        !ex_t_components TYPE cl_abap_structdescr=>component_table
-*        !ex_t_dfies      TYPE ddfields
-*      RETURNING
-*        VALUE(r_result)  TYPE ddfields.
 
         IF im_r_data IS SUPPLIED.
           lr_data = im_r_data.
@@ -910,9 +897,6 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
           lr_tabledesct ?= cl_abap_tabledescr=>describe_by_data_ref( p_data_ref = lr_data ).
           lr_strucdescr ?= lr_tabledesct->get_table_line_type( ).
         ENDIF.
-
-*    lr_strucdescr ?= cl_abap_tabledescr=>describe_by_data_ref( p_data_ref = lr_data ).
-*    lr_strucdescr ?= cl_abap_structdescr=>describe_by_data_ref( p_data_ref = im_r_data ).
 
         r_result = cl_salv_data_descr=>read_structdescr( r_structdescr = lr_strucdescr ).
 
