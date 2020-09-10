@@ -1531,7 +1531,7 @@ CLASS lcl_progress_indicator IMPLEMENTATION.
     IF im_v_text_default IS NOT INITIAL.
       me->text = im_v_text_default.
     ELSE.
-      me->text = 'Processando:  '(001).
+      me->text = 'Processando: '(021).
     ENDIF.
 
   ENDMETHOD.
@@ -1569,7 +1569,7 @@ CLASS lcl_progress_indicator IMPLEMENTATION.
         ENDIF.
 
         IF me->total IS NOT INITIAL.
-          lv_text = | { lv_text } [{ lv_processed }{ ' de '(002) } { me->total }] |.
+          lv_text = | { lv_text } [{ lv_processed }{ ' de '(022) } { me->total }] |.
         ENDIF.
 
         IF me->ratio IS NOT INITIAL.
