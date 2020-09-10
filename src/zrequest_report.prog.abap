@@ -14,9 +14,67 @@ TYPE-POOLS:
 INCLUDE:
   rddkorri.
 
+CLASS:
+  lcl_progress_indicator DEFINITION DEFERRED.
+
 **********************************************************************
 *-------               CLASS DEFINITION                 -------------*
 **********************************************************************
+CLASS lcl_progress_indicator DEFINITION CREATE PUBLIC .
+
+  PUBLIC SECTION.
+
+* Interface required to serialize the object
+    INTERFACES:
+      if_serializable_object.
+
+    EVENTS:
+        show_message .
+
+    CONSTANTS:
+      co_ratio_percentage TYPE i VALUE 25 ##NO_TEXT,
+      co_10_sec           TYPE i VALUE 10000000 ##NO_TEXT,
+      co_1_sec            TYPE i VALUE 1000000 ##NO_TEXT.
+
+    METHODS:
+      show
+        IMPORTING
+          VALUE(im_v_text) TYPE any OPTIONAL
+          im_v_processed   TYPE i OPTIONAL
+          im_v_reset_procd TYPE abap_bool OPTIONAL
+            PREFERRED PARAMETER im_v_processed,
+      get_total RETURNING VALUE(r_result) TYPE i,
+      set_total IMPORTING im_total TYPE i.
+
+    CLASS-METHODS:
+      show_msg_standalone
+        IMPORTING
+          im_v_text TYPE string OPTIONAL.
+
+    METHODS:
+      constructor
+        IMPORTING
+          im_v_total           TYPE i      OPTIONAL
+          im_v_interval_in_sec TYPE i      OPTIONAL
+          im_v_text_default    TYPE string OPTIONAL
+            PREFERRED PARAMETER im_v_total ,
+      reset_processed.
+
+  PRIVATE SECTION.
+    DATA:
+      interval  TYPE i,
+      rtime     TYPE int4,
+      ratio     TYPE decfloat16,
+      total     TYPE i,
+      text      TYPE string,
+      processed TYPE i.
+
+    METHODS:
+      calc_ratio.
+
+
+ENDCLASS.
+
 CLASS lcl_zrequest_report DEFINITION FINAL.
 
   PUBLIC SECTION.
@@ -183,7 +241,7 @@ CLASS lcl_zrequest_report DEFINITION FINAL.
       go_alv_top_of_list TYPE REF TO cl_salv_form_layout_grid,
 *      go_alv_flow_num_rec TYPE REF TO cl_salv_form_layout_flow,
 *      go_alv_flow_date    TYPE REF TO cl_salv_form_layout_flow,
-      go_msg_ind         TYPE REF TO zcl_progress_indicator,
+      go_msg_ind         TYPE REF TO lcl_progress_indicator,
       gt_requests        TYPE trwbo_request_headers,
       gs_selection       TYPE trwbo_selection,
       gs_ranges          TYPE trsel_ts_ranges,
@@ -1446,6 +1504,127 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
       ENDLOOP.
     ENDLOOP.
 
+
+  ENDMETHOD.
+
+ENDCLASS.
+
+CLASS lcl_progress_indicator IMPLEMENTATION.
+
+  METHOD constructor.
+
+    " Total of Interactions
+    me->total = im_v_total.
+
+    " Calculate ratio
+    IF me->total IS NOT INITIAL.
+      me->calc_ratio( ).
+    ENDIF.
+
+    " Define interval to show message progress
+    IF im_v_interval_in_sec IS NOT INITIAL.
+      me->interval = im_v_interval_in_sec * co_1_sec.
+    ELSE.
+      me->interval = co_10_sec.
+    ENDIF.
+
+    IF im_v_text_default IS NOT INITIAL.
+      me->text = im_v_text_default.
+    ELSE.
+      me->text = 'Processando:  '(001).
+    ENDIF.
+
+  ENDMETHOD.
+
+
+  METHOD show.
+
+    DATA:
+      lv_text      TYPE string,
+      lv_output_i  TYPE boole_d VALUE IS INITIAL,
+      lv_rtime     TYPE int4,
+      lv_processed TYPE i.
+
+    TRY.
+
+        IF im_v_reset_procd IS NOT INITIAL.
+          me->reset_processed( ).
+        ENDIF.
+
+        ADD 1 TO me->processed.
+
+        IF im_v_processed IS NOT INITIAL.
+          lv_processed = im_v_processed.
+        ELSE.
+          lv_processed = me->processed.
+        ENDIF.
+
+        " Get RunTime!
+        GET RUN TIME FIELD lv_rtime.
+
+        IF im_v_text IS NOT INITIAL.
+          lv_text = |{ im_v_text }|.
+        ELSE.
+          lv_text = me->text.
+        ENDIF.
+
+        IF me->total IS NOT INITIAL.
+          lv_text = | { lv_text } [{ lv_processed }{ ' de '(002) } { me->total }] |.
+        ENDIF.
+
+        IF me->ratio IS NOT INITIAL.
+          DATA(lv_result_mod) = lv_processed MOD me->ratio.
+        ELSE.
+          lv_result_mod = 1.
+        ENDIF.
+
+*   Displays the message every 25% OR every 10sec or First times
+        IF ( lv_processed LT 4 )      OR
+             lv_result_mod IS INITIAL OR
+             ( lv_rtime - me->rtime ) GT me->interval.
+          lv_output_i = abap_true.
+        ENDIF.
+
+        CALL METHOD cl_progress_indicator=>progress_indicate
+          EXPORTING
+            i_text               = lv_text          " Progress Text (If no message transferred in I_MSG*)
+            i_processed          = lv_processed     " Number of Objects Already Processed
+            i_total              = me->total        " Total Number of Objects to Be Processed
+            i_output_immediately = lv_output_i.     " X = Display Progress Immediately
+
+        me->rtime = lv_rtime.
+
+      CATCH cx_root.
+    ENDTRY.
+
+  ENDMETHOD.
+
+
+  METHOD get_total.
+    r_result = me->total.
+  ENDMETHOD.
+
+  METHOD set_total.
+    me->total = im_total.
+    CALL METHOD me->calc_ratio.
+  ENDMETHOD.
+
+  METHOD reset_processed.
+    CLEAR me->processed.
+  ENDMETHOD.
+
+  METHOD calc_ratio.
+    me->ratio = ceil( me->total / co_ratio_percentage ).
+  ENDMETHOD.
+
+  METHOD show_msg_standalone.
+
+    CALL METHOD cl_progress_indicator=>progress_indicate
+      EXPORTING
+        i_text               = im_v_text          " Progress Text (If no message transferred in I_MSG*)
+        i_processed          = 99     " Number of Objects Already Processed
+        i_total              = 100        " Total Number of Objects to Be Processed
+        i_output_immediately = abap_on.     " X = Display Progress Immediately
 
   ENDMETHOD.
 
