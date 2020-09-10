@@ -304,6 +304,17 @@ CLASS lcl_zrequest_report DEFINITION FINAL.
         CHANGING
           ch_t_tr_import       TYPE ty_t_tr_import.
 
+    CLASS-METHODS get_field_list
+      IMPORTING
+        im_r_data       TYPE REF TO data OPTIONAL
+        im_s_struc      TYPE any OPTIONAL
+        im_t_table      TYPE STANDARD TABLE OPTIONAL
+          PREFERRED PARAMETER im_r_data
+      EXPORTING
+        ex_t_components TYPE cl_abap_structdescr=>component_table
+      RETURNING
+        VALUE(r_result) TYPE ddfields .
+
 ENDCLASS.
 
 DATA: go_request TYPE REF TO lcl_zrequest_report.
@@ -872,6 +883,47 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD get_field_list.
+    DATA:
+      lr_strucdescr TYPE REF TO cl_abap_structdescr,
+      lr_tabledesct TYPE REF TO cl_abap_tabledescr,
+      lr_data       TYPE REF TO data.
+
+    TRY.
+*    im_s_struc      TYPE any            OPTIONAL
+*        !im_t_table      TYPE STANDARD TABLE OPTIONAL
+*          PREFERRED PARAMETER im_r_data
+*      EXPORTING
+*        !ex_t_components TYPE cl_abap_structdescr=>component_table
+*        !ex_t_dfies      TYPE ddfields
+*      RETURNING
+*        VALUE(r_result)  TYPE ddfields.
+
+        IF im_r_data IS SUPPLIED.
+          lr_data = im_r_data.
+          lr_strucdescr ?= cl_abap_structdescr=>describe_by_data_ref( p_data_ref = lr_data ).
+        ELSEIF im_s_struc IS SUPPLIED.
+          CREATE DATA lr_data LIKE im_s_struc.
+          lr_strucdescr ?= cl_abap_structdescr=>describe_by_data_ref( p_data_ref = lr_data ).
+        ELSEIF im_t_table IS SUPPLIED.
+          CREATE DATA lr_data LIKE im_t_table.
+          lr_tabledesct ?= cl_abap_tabledescr=>describe_by_data_ref( p_data_ref = lr_data ).
+          lr_strucdescr ?= lr_tabledesct->get_table_line_type( ).
+        ENDIF.
+
+*    lr_strucdescr ?= cl_abap_tabledescr=>describe_by_data_ref( p_data_ref = lr_data ).
+*    lr_strucdescr ?= cl_abap_structdescr=>describe_by_data_ref( p_data_ref = im_r_data ).
+
+        r_result = cl_salv_data_descr=>read_structdescr( r_structdescr = lr_strucdescr ).
+
+        ex_t_components = lr_strucdescr->get_components( ).
+
+      CATCH cx_sy_ref_is_initial.
+      CATCH cx_root.
+
+    ENDTRY.
+
+  ENDMETHOD.
 
   METHOD call_rddit076.
 
