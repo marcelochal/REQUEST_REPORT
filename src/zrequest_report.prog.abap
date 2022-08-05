@@ -1,12 +1,12 @@
 REPORT zrequest_report.
 
 TABLES:
-  tmsbufreq,
-  tstrfcofil,
-  e070,
-  e070c,
-  e07t,
-  e070ctv.
+  tmsbufreq,    "TMS Manager: Transport Requests in Transport Buffer
+  tstrfcofil,   "Logical Contents of cofiles Files: Lines
+  e070,         "Change & Transport System: Header of Requests/Tasks
+  e070c,        "CTS: Source/Target Client of Requests/Tasks
+  e07t,         "Change & Transport System: Short Texts for Requests/Tasks
+  e070ctv.      "Generated Table for View
 
 TYPE-POOLS:
   ctslg, slis, icon, trwbo, trsel.
@@ -15,11 +15,175 @@ INCLUDE:
   rddkorri.
 
 CLASS:
-  lcl_progress_indicator DEFINITION DEFERRED.
+  lcl_progress_indicator DEFINITION DEFERRED,
+  lcl_zr_main            DEFINITION DEFERRED.
+
+
+INTERFACE lif_zr_types.
+
+  TYPES:
+    "!<p class="shorttext synchronized">Type of structure for ALV </p>
+    BEGIN OF ty_s_alv,
+      trkorr       TYPE trkorr,           " Request/Task
+      trfunction   TYPE e070-trfunction,  " Type of request/task
+      trfunctn_t   TYPE ko013-trfunctn_t, " Type (short text)
+      client       TYPE trclient,         " Source client of request
+      systemid     TYPE tarsystem,        " target system
+      rc           TYPE strw_int4,        " return code
+      rc_icon      TYPE icon_l4,          " return code
+      trstatus     TYPE trstatus,         " Status of request/task
+      trstatus_txt TYPE trstatus_t,       " Status of request/task Text
+      date_step    TYPE as4date,          " Date Transport
+      time_step    TYPE as4time,          " Time Transport
+      as4user      TYPE trheader-as4user, " Owner of request/task
+      as4text      TYPE as4text,          " Short Description of Repository Objects
+      as4user_name TYPE ad_namtext,       " Full Name of Person
+*        tarclient    TYPE e070c-tarclient,  " Target client for the request
+      as4date      TYPE trheader-as4date, " Last Changed On
+      as4time      TYPE trheader-as4time, " Last changed at
+*        tardevcl     TYPE e070m-tardevcl,   " Target Package
+*        devclass     TYPE e070m-devclass,   " Package
+*        tarlayer     TYPE e070m-tarlayer,   " Target Transport Layer
+    END OF ty_s_alv,
+
+    "!<p class="shorttext synchronized">Type of table for ALV </p>
+    ty_t_alv TYPE STANDARD TABLE OF ty_s_alv WITH KEY trkorr trfunction trfunctn_t systemid
+               WITH NON-UNIQUE SORTED KEY key1      COMPONENTS trkorr
+               WITH NON-UNIQUE SORTED KEY sort_key1 COMPONENTS date_step time_step trkorr trfunction trfunctn_t systemid,
+
+    "!<p class="shorttext synchronized">Type of structure of path for upload or download</p>
+    BEGIN OF ty_s_default_path,
+      upload   TYPE string,
+      download TYPE string,
+    END OF ty_s_default_path,
+
+    "!<p class="shorttext synchronized">Type of structure of TMS CI: Systems</p>
+    BEGIN OF ty_s_tmscsys,
+      alowed  TYPE xfeld,
+      sys_prd TYPE abap_bool,
+      sys_qa  TYPE abap_bool.
+      INCLUDE TYPE tmscsys.
+    TYPES END OF ty_s_tmscsys.
+
+  "!<p class="shorttext synchronized">Type of table of TMS CI: Systems</p>
+  TYPES ty_t_sys TYPE STANDARD TABLE OF ty_s_tmscsys  WITH KEY alowed domnam sysnam limbo.
+
+  TYPES:
+    "!<p class="shorttext synchronized">Type of structure of TMS configuration</p>
+    BEGIN OF ty_s_conf,
+      invers     TYPE tcevers-version,   " memory input version
+      source     TYPE tcesyst-sysname,   " loaded systemconfig
+      domname    TYPE tmscdom-domnam,
+      trlayer    TYPE triwb_t_trlayer,   " transport layer
+      laytext    TYPE triwb_t_laytext,
+      system     TYPE triwb_t_system,
+      system2    TYPE triwb_t_dsysts,    " system list
+      systext    TYPE triwb_t_systext,
+      release    TYPE triwb_t_release,   " new integration control
+      deliver    TYPE triwb_t_deliver,   " deliveries
+      target     TYPE triwb_t_target,    " targets
+      tartext    TYPE triwb_t_tartext,
+      clientc    TYPE triwb_t_clientc,   " client control
+      dpltargets TYPE triwb_t_dpltarg,   " deploy targets
+      version    TYPE triwb_s_version,   " versions
+      vertext    TYPE triwb_t_vertext,
+      tms_conf   TYPE tmsmconf,
+      domains    TYPE tmscdom,
+    END OF ty_s_conf,
+
+    "!<p class="shorttext synchronized">Type of structure of files for upload and download requests </p>
+    BEGIN OF ty_s_tr_files,
+      filename       TYPE string,
+      filetype       TYPE c LENGTH 1,
+      filepath       TYPE string,
+      server_path    TYPE eseiefile,
+      filelength_bin TYPE i,
+      header         TYPE xstring,
+      data_tab       TYPE esy_tt_rcgrepfile, "rcgrepfile.
+      text_buffer    TYPE string,
+      filelength_asc TYPE i,
+    END OF ty_s_tr_files,
+
+    "!<p class="shorttext synchronized">Type of table of files for upload and download requests </p>
+    ty_t_tr_files TYPE STANDARD TABLE OF ty_s_tr_files WITH KEY filename,
+
+    "!<p class="shorttext synchronized">Type of structure of import requests </p>
+    BEGIN OF ty_s_tr_import,
+      trkorr        TYPE trkorr,           " Request/Task
+      trfunction    TYPE e070-trfunction,  " Type of request/task
+      trfunctn_t    TYPE ko013-trfunctn_t, " Type (short text)
+      client        TYPE trclient,         " Source client of request
+      srcsystem     TYPE srcsystem,        " Original System of Object
+      tarsystem     TYPE tarsystem,        " target system
+      date_step     TYPE as4date,          " Date Transport
+      time_step     TYPE as4time,          " Time Transport
+      as4user       TYPE trheader-as4user, " Owner of request/task
+      t_tr_filedata TYPE ty_t_tr_files,
+    END OF ty_s_tr_import,
+
+    "!<p class="shorttext synchronized">Type of table of import requests </p>
+    ty_t_tr_import  TYPE STANDARD TABLE OF ty_s_tr_import WITH KEY trkorr,
+    ty_t_file_table TYPE STANDARD TABLE OF file_info WITH DEFAULT KEY.
+
+  CONSTANTS:
+*      gc_development_sys TYPE tarsystem VALUE 'S4D',
+*      gc_quality_sys     TYPE tarsystem VALUE 'S4Q',
+*      gc_production_sys  TYPE tarsystem VALUE 'S4P',
+
+    BEGIN OF gc_trstatus,
+      modifiable      TYPE trstatus VALUE 'D',        " D Modifiable
+      modifiable_prot TYPE trstatus VALUE 'L',        " L Modifiable, Protected
+      release_started TYPE trstatus VALUE 'O',        " O Release Started
+      released        TYPE trstatus VALUE 'R',        " R Released
+      released_repair TYPE trstatus VALUE 'N',        " N Released (with Import Protection for Repaired Objects)
+    END OF gc_trstatus,
+
+    BEGIN OF gc_trfunction,
+      customizing       TYPE trfunction VALUE 'W',    " W Customizing Request
+      workbench         TYPE trfunction VALUE 'K',    " K Workbench Request
+      transport_copies  TYPE trfunction VALUE 'T',    " T Transport of Copies
+      relocation        TYPE trfunction VALUE 'C',    " C Relocation of Objects Without Package Change
+      relocation_packch TYPE trfunction VALUE 'O',    " O Relocation of Objects with Package Change
+      relocation_compl  TYPE trfunction VALUE 'E',    " E Relocation of complete package
+    END OF gc_trfunction,
+
+    BEGIN OF gc_task_function,
+      customizing       TYPE trfunction VALUE 'S',    " S   Development/Correction
+      workbench         TYPE trfunction VALUE 'R',    " R   Repair
+      unclassified_task TYPE trfunction VALUE 'X',    " X   Unclassified Task
+      relocation        TYPE trfunction VALUE 'Q',    " Q   Customizing Task
+      relocation_packch TYPE trfunction VALUE 'G',    " G   Piece List for CTS Project
+      relocation_compl  TYPE trfunction VALUE 'M',    " M   Client Transport Request
+      pl_upgrade        TYPE trfunction VALUE 'P',    " P   Piece List for Upgrade
+      pl_support_pack   TYPE trfunction VALUE 'D',    " D   Piece List for Support Package
+      piece_list        TYPE trfunction VALUE 'F',    " F   Piece List
+      deletion          TYPE trfunction VALUE 'L',    " L   Deletion transport
+    END OF gc_task_function,
+
+    BEGIN OF gc_tr_file,
+      data_path     TYPE c LENGTH 4 VALUE 'data',
+      data_prefix   TYPE c LENGTH 1 VALUE 'R',
+      cofiles_path  TYPE c LENGTH 7 VALUE 'cofiles',
+      cofile_prefix TYPE c LENGTH 1 VALUE 'K',
+    END OF gc_tr_file,
+
+    BEGIN OF gc_log_stepid,
+      import                TYPE trbatfunc VALUE 'I',
+      dictionary_activation TYPE trbatfunc VALUE 'A', " Dictionary Activation
+      import_ended          TYPE trbatfunc VALUE '!', " Import ended
+      waiting_qa_approval   TYPE trbatfunc VALUE 'p', " Request waiting for QA approval
+      qa_approval_given     TYPE trbatfunc VALUE 'q', " QA approval given
+    END OF gc_log_stepid.
+
+ENDINTERFACE.
 
 **********************************************************************
 *-------               CLASS DEFINITION                 -------------*
 **********************************************************************
+
+*--------------------------------------------------------------------*
+*---          CLASS LCL_PROGRESS_INDICATOR DEFINITION            ----*
+*--------------------------------------------------------------------*
 CLASS lcl_progress_indicator DEFINITION CREATE PUBLIC .
 
   PUBLIC SECTION.
@@ -75,208 +239,93 @@ CLASS lcl_progress_indicator DEFINITION CREATE PUBLIC .
 
 ENDCLASS.
 
-CLASS lcl_zrequest_report DEFINITION FINAL.
+"!<p class="shorttext synchronized">Main Class of report</p>
+CLASS lcl_zr_main DEFINITION FINAL.
 
   PUBLIC SECTION.
-    TYPES:
-      BEGIN OF ty_s_alv,
-        trkorr       TYPE trkorr,           " Request/Task
-        trfunction   TYPE e070-trfunction,  " Type of request/task
-        trfunctn_t   TYPE ko013-trfunctn_t, " Type (short text)
-        client       TYPE trclient,         " Source client of request
-        systemid     TYPE tarsystem,        " target system
-        rc           TYPE strw_int4,        " return code
-        rc_icon      TYPE icon_l4,          " return code
-        trstatus     TYPE trstatus,         " Status of request/task
-        trstatus_txt TYPE trstatus_t,       " Status of request/task Text
-        date_step    TYPE as4date,          " Date Transport
-        time_step    TYPE as4time,          " Time Transport
-        as4user      TYPE trheader-as4user, " Owner of request/task
-        as4text      TYPE as4text,          " Short Description of Repository Objects
-        as4user_name TYPE ad_namtext,       " Full Name of Person
-*        tarclient    TYPE e070c-tarclient,  " Target client for the request
-        as4date      TYPE trheader-as4date, " Last Changed On
-        as4time      TYPE trheader-as4time, " Last changed at
-*        tardevcl     TYPE e070m-tardevcl,   " Target Package
-*        devclass     TYPE e070m-devclass,   " Package
-*        tarlayer     TYPE e070m-tarlayer,   " Target Transport Layer
-      END OF ty_s_alv,
+    INTERFACES:
+      lif_zr_types.
 
-      ty_t_alv TYPE STANDARD TABLE OF ty_s_alv WITH KEY trkorr trfunction trfunctn_t systemid
-                 WITH NON-UNIQUE SORTED KEY key1      COMPONENTS trkorr
-                 WITH NON-UNIQUE SORTED KEY sort_key1 COMPONENTS date_step time_step trkorr trfunction trfunctn_t systemid,
-
-      BEGIN OF ty_s_default_path,
-        upload   TYPE string,
-        download TYPE string,
-      END OF ty_s_default_path.
-
-    TYPES: BEGIN OF ty_s_tmscsys,
-             alowed TYPE xfeld.
-        INCLUDE TYPE tmscsys.
-    TYPES END OF ty_s_tmscsys.
-
-    TYPES ty_t_sys TYPE STANDARD TABLE OF ty_s_tmscsys  WITH KEY alowed domnam sysnam limbo.
-
-    TYPES: BEGIN OF ty_s_conf,
-             invers     TYPE tcevers-version,   " memory input version
-             source     TYPE tcesyst-sysname,   " loaded systemconfig
-             domname    TYPE tmscdom-domnam,
-             trlayer    TYPE triwb_t_trlayer,   " transport layer
-             laytext    TYPE triwb_t_laytext,
-             system     TYPE triwb_t_system,
-             system2    TYPE triwb_t_dsysts,    " system list
-             systext    TYPE triwb_t_systext,
-             release    TYPE triwb_t_release,   " new integration control
-             deliver    TYPE triwb_t_deliver,   " deliveries
-             target     TYPE triwb_t_target,    " targets
-             tartext    TYPE triwb_t_tartext,
-             clientc    TYPE triwb_t_clientc,   " client control
-             dpltargets TYPE triwb_t_dpltarg,   " deploy targets
-             version    TYPE triwb_s_version,   " versions
-             vertext    TYPE triwb_t_vertext,
-             tms_conf   TYPE tmsmconf,
-             domains    TYPE tmscdom,
-           END OF ty_s_conf,
-
-           BEGIN OF ty_s_tr_files,
-             filename       TYPE string,
-             filetype       TYPE c LENGTH 1,
-             filepath       TYPE string,
-             server_path    TYPE eseiefile,
-             filelength_bin TYPE i,
-             header         TYPE xstring,
-             data_tab       TYPE esy_tt_rcgrepfile, "rcgrepfile.
-             text_buffer    TYPE string,
-             filelength_asc TYPE i,
-           END OF ty_s_tr_files,
-           ty_t_tr_files TYPE STANDARD TABLE OF ty_s_tr_files WITH KEY filename,
-           BEGIN OF ty_s_tr_import,
-             trkorr        TYPE trkorr,           " Request/Task
-             trfunction    TYPE e070-trfunction,  " Type of request/task
-             trfunctn_t    TYPE ko013-trfunctn_t, " Type (short text)
-             client        TYPE trclient,         " Source client of request
-             srcsystem     TYPE srcsystem,        " Original System of Object
-             tarsystem     TYPE tarsystem,        " target system
-             date_step     TYPE as4date,          " Date Transport
-             time_step     TYPE as4time,          " Time Transport
-             as4user       TYPE trheader-as4user, " Owner of request/task
-             t_tr_filedata TYPE ty_t_tr_files,
-           END OF ty_s_tr_import,
-
-           ty_t_tr_import  TYPE STANDARD TABLE OF ty_s_tr_import WITH KEY trkorr,
-           ty_t_file_table TYPE STANDARD TABLE OF file_info WITH DEFAULT KEY.
-
-    CONSTANTS:
-*      cc_development_sys TYPE tarsystem VALUE 'S4D',
-      cc_quality_sys    TYPE tarsystem VALUE 'S4Q',
-      cc_production_sys TYPE tarsystem VALUE 'S4P',
-      BEGIN OF gc_trstatus,
-        modifiable      TYPE trstatus VALUE 'D',        " D Modifiable
-        modifiable_prot TYPE trstatus VALUE 'L',        " L Modifiable, Protected
-        release_started TYPE trstatus VALUE 'O',        " O Release Started
-        released        TYPE trstatus VALUE 'R',        " R Released
-        released_repair TYPE trstatus VALUE 'N',        " N Released (with Import Protection for Repaired Objects)
-      END OF gc_trstatus,
-
-      BEGIN OF gc_trfunction,
-        customizing       TYPE trfunction VALUE 'W',    " W Customizing Request
-        workbench         TYPE trfunction VALUE 'K',    " K Workbench Request
-        transport_copies  TYPE trfunction VALUE 'T',    " T Transport of Copies
-        relocation        TYPE trfunction VALUE 'C',    " C Relocation of Objects Without Package Change
-        relocation_packch TYPE trfunction VALUE 'O',    " O Relocation of Objects with Package Change
-        relocation_compl  TYPE trfunction VALUE 'E',    " E Relocation of complete package
-      END OF gc_trfunction,
-
-      BEGIN OF gc_task_function,
-        customizing       TYPE trfunction VALUE 'S',    " S   Development/Correction
-        workbench         TYPE trfunction VALUE 'R',    " R   Repair
-        unclassified_task TYPE trfunction VALUE 'X',    " X   Unclassified Task
-        relocation        TYPE trfunction VALUE 'Q',    " Q   Customizing Task
-        relocation_packch TYPE trfunction VALUE 'G',    " G   Piece List for CTS Project
-        relocation_compl  TYPE trfunction VALUE 'M',    " M   Client Transport Request
-        pl_upgrade        TYPE trfunction VALUE 'P',    " P   Piece List for Upgrade
-        pl_support_pack   TYPE trfunction VALUE 'D',    " D   Piece List for Support Package
-        piece_list        TYPE trfunction VALUE 'F',    " F   Piece List
-        deletion          TYPE trfunction VALUE 'L',    " L   Deletion transport
-      END OF gc_task_function,
-
-      BEGIN OF gc_tr_file,
-        data_path     TYPE c LENGTH 4 VALUE 'data',
-        data_prefix   TYPE c LENGTH 1 VALUE 'R',
-        cofiles_path  TYPE c LENGTH 7 VALUE 'cofiles',
-        cofile_prefix TYPE c LENGTH 1 VALUE 'K',
-      END OF gc_tr_file,
-
-      BEGIN OF gc_log_stepid,
-        import                TYPE trbatfunc VALUE 'I',
-        dictionary_activation TYPE trbatfunc VALUE 'A', " Dictionary Activation
-        import_ended          TYPE trbatfunc VALUE '!', " Import ended
-        waiting_qa_approval   TYPE trbatfunc VALUE 'p', " Request waiting for QA approval
-        qa_approval_given     TYPE trbatfunc VALUE 'q', " QA approval given
-      END OF gc_log_stepid.
+    ALIASES:
+        ty_t_alv            FOR lif_zr_types~ty_t_alv,
+        ty_s_alv            FOR lif_zr_types~ty_s_alv,
+        ty_s_default_path   FOR lif_zr_types~ty_s_default_path,
+        ty_t_sys            FOR lif_zr_types~ty_t_sys,
+        ty_s_conf           FOR lif_zr_types~ty_s_conf,
+        ty_s_tr_import      FOR lif_zr_types~ty_s_tr_import,
+        ty_t_file_table     FOR lif_zr_types~ty_t_file_table,
+        ty_t_tr_import      FOR lif_zr_types~ty_t_tr_import,
+        gc_trfunction       FOR lif_zr_types~gc_trfunction,
+        gc_task_function    FOR lif_zr_types~gc_task_function,
+        gc_trstatus         FOR lif_zr_types~gc_trstatus,
+        gc_log_stepid       FOR lif_zr_types~gc_log_stepid,
+        gc_tr_file          FOR lif_zr_types~gc_tr_file.
 
     DATA:
+      "!<p class="shorttext synchronized">ALV Internal Table</p>
       gt_alv       TYPE ty_t_alv.
 
 *--------------------------------------------------------------------*
 *-------------         METHODS PUBLIC SECTION           -------------*
 *--------------------------------------------------------------------*
     METHODS:
+      "!<p class="shorttext synchronized">Method Constructor</p>
       constructor,
-      trint_select_requests
-        IMPORTING
-          im_v_refresh TYPE abap_bool OPTIONAL,
+
+      "!<p class="shorttext synchronized">User command method</p>
+      "! @parameter im_v_ucomm | User command ID
       user_command
         IMPORTING
-          VALUE(im_v_ucomm) TYPE syst_ucomm,
-      alv_show.
+          VALUE(im_v_ucomm) TYPE syst_ucomm.
 
   PROTECTED SECTION.
 
   PRIVATE SECTION.
 
     DATA:
-      go_alv_table       TYPE REF TO cl_salv_table,
-      go_alv_top_of_list TYPE REF TO cl_salv_form_layout_grid,
-*      go_alv_flow_num_rec TYPE REF TO cl_salv_form_layout_flow,
-*      go_alv_flow_date    TYPE REF TO cl_salv_form_layout_flow,
-      go_msg_ind         TYPE REF TO lcl_progress_indicator,
-      gt_requests        TYPE trwbo_request_headers,
-      gs_selection       TYPE trwbo_selection,
-      gs_ranges          TYPE trsel_ts_ranges,
-      gs_default_path    TYPE ty_s_default_path,
-      gt_sys             TYPE ty_t_sys,
-      gs_conf            TYPE ty_s_conf.
+      "!<p class="shorttext synchronized">Object for SALV TABLE Class</p>
+      go_alv_table    TYPE REF TO cl_salv_table,
+      "!<p class="shorttext synchronized">Object for message progress</p>
+      go_msg_ind      TYPE REF TO lcl_progress_indicator,
+      gt_requests     TYPE trwbo_request_headers,
+      gs_selection    TYPE trwbo_selection,
+      gs_ranges       TYPE trsel_ts_ranges,
+      gs_default_path TYPE ty_s_default_path,
+      gt_sys          TYPE ty_t_sys,
+      gs_conf         TYPE ty_s_conf.
+
 
 *--------------------------------------------------------------------*
 *-------------        METHODS PRIVATE SECTION           -------------*
 *--------------------------------------------------------------------*
     METHODS:
       data_retrieval,
+      trint_select_requests
+        IMPORTING
+          im_v_refresh TYPE abap_bool OPTIONAL,
       delete_system_not_final
         IMPORTING
           im_v_system TYPE tarsystem,
 
       on_alv_link_click     FOR EVENT link_click OF cl_salv_events_table
         IMPORTING
-            row
-            column,
+          row
+          column,
 
       on_alv_user_command   FOR EVENT if_salv_events_functions~added_function  OF cl_salv_events_table
         IMPORTING
-            e_salv_function,
+          e_salv_function,
       on_alv_double_click   FOR EVENT double_click OF cl_salv_events_table
         IMPORTING
-            row
-            column,
+          row
+          column,
       alv_create,
       alv_set_icon_type
         CHANGING
-          ch_s_alv TYPE lcl_zrequest_report=>ty_s_alv,
+          ch_s_alv TYPE lcl_zr_main=>ty_s_alv,
       alv_set_tr_text
         CHANGING
-          ch_s_alv TYPE lcl_zrequest_report=>ty_s_alv,
+          ch_s_alv TYPE lcl_zr_main=>ty_s_alv,
       alv_set_columns,
       call_rddit076,
       tr_download,
@@ -302,32 +351,25 @@ CLASS lcl_zrequest_report DEFINITION FINAL.
           im_v_filename        TYPE file_info-filename
           im_v_selected_folder TYPE string
         CHANGING
-          ch_t_tr_import       TYPE ty_t_tr_import.
-
-    CLASS-METHODS get_field_list
-      IMPORTING
-        im_r_data       TYPE REF TO data OPTIONAL
-        im_s_struc      TYPE any OPTIONAL
-        im_t_table      TYPE STANDARD TABLE OPTIONAL
-          PREFERRED PARAMETER im_r_data
-      EXPORTING
-        ex_t_components TYPE cl_abap_structdescr=>component_table
-      RETURNING
-        VALUE(r_result) TYPE ddfields .
+          ch_t_tr_import       TYPE ty_t_tr_import,
+      "!<p class="shorttext synchronized"> Show ALV</p>
+      alv_show.
 
 ENDCLASS.
 
-DATA: go_request TYPE REF TO lcl_zrequest_report.
-
 INITIALIZATION.
 
-  CREATE OBJECT go_request.
+  DATA(go_main) = NEW lcl_zr_main( ).
 
-CLASS lcl_zrequest_report IMPLEMENTATION.
+
+*--------------------------------------------------------------------*
+*-------------          CLASS IMPLEMENTATION            -------------*
+*--------------------------------------------------------------------*
+CLASS lcl_zr_main IMPLEMENTATION.
 
   METHOD constructor.
 
-    DATA: lt_sys             TYPE STANDARD TABLE OF tmscsys  WITH KEY domnam sysnam limbo.
+    DATA: lt_sys TYPE STANDARD TABLE OF tmscsys  WITH KEY domnam sysnam limbo.
 
     " Read configuration from system
     CALL FUNCTION 'TMS_CFG_READ_CONFIGURATION'
@@ -347,22 +389,24 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
         WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
     ENDIF.
 
+    MOVE-CORRESPONDING lt_sys TO me->gt_sys.
+
     CALL FUNCTION 'TRINT_TCE_READ_CONFIG'
       EXPORTING
         iv_language   = syst-langu
       IMPORTING
-        et_vertext    = gs_conf-vertext
-        es_version    = gs_conf-version
-        et_system     = gs_conf-system
-        et_trlayer    = gs_conf-trlayer
-        et_release    = gs_conf-release
-        et_deliver    = gs_conf-deliver
-        et_systext    = gs_conf-systext
-        et_laytext    = gs_conf-laytext
-        et_tartext    = gs_conf-tartext
-        et_target     = gs_conf-target
-        et_clientc    = gs_conf-clientc
-        et_dpltargets = gs_conf-dpltargets
+        et_vertext    = me->gs_conf-vertext
+        es_version    = me->gs_conf-version
+        et_system     = me->gs_conf-system
+        et_trlayer    = me->gs_conf-trlayer
+        et_release    = me->gs_conf-release
+        et_deliver    = me->gs_conf-deliver
+        et_systext    = me->gs_conf-systext
+        et_laytext    = me->gs_conf-laytext
+        et_tartext    = me->gs_conf-tartext
+        et_target     = me->gs_conf-target
+        et_clientc    = me->gs_conf-clientc
+        et_dpltargets = me->gs_conf-dpltargets
       EXCEPTIONS
         OTHERS        = 3.
     IF sy-subrc NE 0.
@@ -370,12 +414,17 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
         WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
     ENDIF.
 
+    LOOP AT me->gt_sys ASSIGNING FIELD-SYMBOL(<ls_sys>) WHERE systyp EQ 'R'.
 
+      IF line_exists( me->gs_conf-deliver[ fromsystem = <ls_sys>-sysnam ] ).
+        <ls_sys>-sys_qa = abap_true.
+      ENDIF.
 
+      IF line_exists( me->gs_conf-deliver[ tosystem(3) = <ls_sys>-sysnam ] ).
+        <ls_sys>-sys_prd = abap_true.
+      ENDIF.
 
-
-
-    MOVE-CORRESPONDING lt_sys TO me->gt_sys.
+    ENDLOOP.
 
     cl_gui_frontend_services=>get_upload_download_path(
       CHANGING
@@ -386,9 +435,9 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
 
     me->alv_create(  ).
 
-    me->trint_select_requests(  ).
-
-    me->alv_show(  ).
+    DO. "Loop for back from ALV to new selection
+      me->trint_select_requests( ).
+    ENDDO.
 
   ENDMETHOD.
 
@@ -456,7 +505,14 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    CALL METHOD data_retrieval.
+    me->data_retrieval( ).
+
+    IF me->gt_alv IS INITIAL.
+      MESSAGE s011(tk) DISPLAY LIKE 'E'."No requests found
+      RETURN.
+    ELSE.
+      me->alv_show(  ).
+    ENDIF.
 
   ENDMETHOD.
 
@@ -500,14 +556,16 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
         IMPORTING
           es_cofile = ls_cofile.
 
-      IF <fs_requests>-trstatus   EQ gc_trstatus-modifiable OR "D  Modificável
-         <fs_requests>-trfunction CA gc_task_function .        " Task
+      IF <fs_requests>-trstatus   EQ gc_trstatus-modifiable      OR "D  Modifiable
+         <fs_requests>-trstatus   EQ gc_trstatus-release_started OR "O Release Started
+         <fs_requests>-trstatus   EQ gc_trstatus-released        OR "R Released
+         <fs_requests>-trfunction CA gc_task_function .             " Contains Any Task
 
         MOVE-CORRESPONDING:
             <fs_requests> TO ls_alv,
             ls_request-h  TO ls_alv.
 *        ls_alv-client   = ls_request-h-client.
-        ls_alv-systemid = sy-sysid.
+        ls_alv-systemid = <fs_requests>-trkorr(3).
         ls_alv-rc       = 99.
 
         me->alv_set_tr_text( CHANGING ch_s_alv = ls_alv ).
@@ -517,7 +575,7 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
       ENDIF.
 
       LOOP AT ls_cofile-systems     ASSIGNING FIELD-SYMBOL(<fs_system>).
-        LOOP AT <fs_system>-steps   ASSIGNING FIELD-SYMBOL(<fs_step>) WHERE stepid EQ gc_log_stepid-import.
+        LOOP AT <fs_system>-steps   ASSIGNING FIELD-SYMBOL(<fs_step>) WHERE stepid EQ me->gc_log_stepid-import.
 
           ls_alv-client   = ls_request-h-client.
           ls_alv-systemid = <fs_system>-systemid.
@@ -548,8 +606,8 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
 
     DELETE ADJACENT DUPLICATES FROM me->gt_alv COMPARING trkorr systemid.
 
-    me->delete_system_not_final( me->cc_production_sys ).
-    me->delete_system_not_final( me->cc_quality_sys ).
+    me->delete_system_not_final( me->gt_sys[ sys_prd = abap_true ]-sysnam ).
+    me->delete_system_not_final( me->gt_sys[ sys_qa  = abap_true ]-sysnam ).
 
     SORT me->gt_alv  DESCENDING BY date_step time_step .
 
@@ -561,10 +619,7 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
 **********************************************************************
   METHOD delete_system_not_final.
 
-    DATA:
-    lt_alv TYPE TABLE OF ty_s_alv.
-
-    MOVE me->gt_alv TO lt_alv.
+    DATA(lt_alv) = me->gt_alv .
 
     LOOP AT lt_alv ASSIGNING FIELD-SYMBOL(<fs_s_alv>) WHERE systemid = im_v_system.
       DELETE me->gt_alv WHERE trkorr   EQ <fs_s_alv>-trkorr
@@ -576,24 +631,31 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
 
   METHOD alv_show.
     DATA:
-      lo_logo              TYPE REF TO cl_salv_form_layout_logo.
+      lo_logo            TYPE REF TO cl_salv_form_layout_logo,
+      lo_alv_top_of_list TYPE REF TO cl_salv_form_layout_grid.
 
-    go_alv_top_of_list->create_flow( row = 1 column  = 1 )->create_label( text = 'Sistema:'(017) ).
-    go_alv_top_of_list->create_flow( row = 1 column  = 2 )->create_text(  text = |{ syst-sysid } { syst-mandt }| ).
+    CREATE OBJECT lo_alv_top_of_list
+      EXPORTING
+        columns = 3.
 
-    go_alv_top_of_list->create_flow( row = 2 column  = 1 )->create_label( text = 'Usuário:'(016) ).
-    go_alv_top_of_list->create_flow( row = 2 column  = 2 )->create_text(  text = |{ syst-uname }| ).
+    me->go_alv_table->set_top_of_list( value = lo_alv_top_of_list ).
 
-    go_alv_top_of_list->create_flow( row = 3 column  = 1 )->create_label( text = |{ 'Data de execução:'(015) }| ).
-    go_alv_top_of_list->create_flow( row = 3 column  = 2 )->create_text(  text = |{ sy-datlo DATE = USER } { syst-uzeit TIME = USER }| ).
+    lo_alv_top_of_list->create_flow( row = 1 column  = 1 )->create_label( text = 'System:'(017) ).
+    lo_alv_top_of_list->create_flow( row = 1 column  = 2 )->create_text(  text = |{ syst-sysid } { syst-mandt }| ).
 
-    go_alv_top_of_list->create_flow( row = 4 column  = 1 )->create_label( text = 'Número total de registros selecionados: '(014) ).
-    go_alv_top_of_list->create_flow( row = 4 column  = 2 )->create_text(  text = lines( me->gt_alv ) ).
+    lo_alv_top_of_list->create_flow( row = 2 column  = 1 )->create_label( text = 'User:'(016) ).
+    lo_alv_top_of_list->create_flow( row = 2 column  = 2 )->create_text(  text = |{ syst-uname }| ).
+
+    lo_alv_top_of_list->create_flow( row = 3 column  = 1 )->create_label( text = |{ 'Execution date:'(015) }| ).
+    lo_alv_top_of_list->create_flow( row = 3 column  = 2 )->create_text(  text = |{ sy-datlo DATE = USER } { syst-uzeit TIME = USER }| ).
+
+    lo_alv_top_of_list->create_flow( row = 4 column  = 1 )->create_label( text = 'Total number of selected records: '(014) ).
+    lo_alv_top_of_list->create_flow( row = 4 column  = 2 )->create_text(  text = lines( me->gt_alv ) ).
 
     CREATE OBJECT lo_logo.
 
 * set left content
-    lo_logo->set_left_content( go_alv_top_of_list ).
+    lo_logo->set_left_content( lo_alv_top_of_list ).
 
 * set Right Image
     lo_logo->set_right_logo( 'ZTAESA_LOGO_ALV' ).
@@ -619,9 +681,7 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
         LEAVE TO LIST-PROCESSING.
 
       WHEN '&F03'. "Back
-        CALL METHOD:
-            me->trint_select_requests( ),
-            me->alv_show.
+        " Do Nothing
 
       WHEN '&F15' OR '&F12'. " Exit or Cancel
         LEAVE PROGRAM.
@@ -702,17 +762,17 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
     TRY.
 
         " Create object ALV TABLE
-        CALL METHOD cl_salv_table=>factory
+        cl_salv_table=>factory(
           IMPORTING
             r_salv_table = me->go_alv_table " Basis Class Simple ALV Tables
           CHANGING
-            t_table      = me->gt_alv.
+            t_table      = me->gt_alv ).
 
-        CALL METHOD me->go_alv_table->set_screen_status
+        me->go_alv_table->set_screen_status(
           EXPORTING
             report        = syst-repid                          " ABAP Program: Current Master Program
             pfstatus      = 'ALV_STATUS'                        " Screens, Current GUI Status
-            set_functions = me->go_alv_table->c_functions_all.  " ALV: Data Element for Constants
+            set_functions = me->go_alv_table->c_functions_all )." ALV: Data Element for Constants
 
         me->go_alv_table->get_functions( )->set_all( abap_true ).
 
@@ -737,13 +797,6 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
         DATA(lv_has_layout_default) = me->go_alv_table->get_layout( )->has_default( ).
         DATA(salv_s_layout)         = me->go_alv_table->get_layout( )->get_default_layout( ).
 
-        CREATE OBJECT go_alv_top_of_list
-          EXPORTING
-            columns = 3.
-        me->go_alv_table->set_top_of_list( value = go_alv_top_of_list ).
-
-*        me->alv_create_header_and_footer( ).
-
         "events
         lo_events = me->go_alv_table->get_event( ).
         SET HANDLER me->on_alv_link_click       FOR lo_events.
@@ -763,7 +816,7 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
 
     " Set Icon type
     CASE ch_s_alv-rc.
-      WHEN 0.                               "Sucess
+      WHEN 0 OR 1.                          "Sucess
         ch_s_alv-rc_icon = icon_led_green.
       WHEN 4 OR 6 OR 1204.                  "Warning
         ch_s_alv-rc_icon = icon_led_yellow.
@@ -805,30 +858,22 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
 
   METHOD alv_set_columns.
     DATA:
-      lo_alv_columns    TYPE REF TO cl_salv_columns,
       lo_alv_colum      TYPE REF TO cl_salv_column_table,
-      lt_components     TYPE cl_abap_structdescr=>component_table,
-      lt_ddfields       TYPE ddfields,
-      ls_ddic_reference TYPE salv_s_ddic_reference.
+      ls_ddic_reference TYPE salv_s_ddic_reference,
+      lt_columns_table  TYPE salv_t_column_ref.
 
     TRY.
-        lo_alv_columns ?= me->go_alv_table->get_columns( ).
-        lo_alv_columns->set_optimize( abap_true ).
 
-        me->get_field_list(
-          EXPORTING
-            im_t_table      = me->gt_alv
-          IMPORTING
-            ex_t_components = lt_components
-          RECEIVING
-            r_result        = lt_ddfields        ).
+        me->go_alv_table->get_columns( )->set_optimize( abap_true ).
 
-        LOOP AT lt_components ASSIGNING FIELD-SYMBOL(<component>).
+        lt_columns_table = me->go_alv_table->get_columns( )->get( ).
 
-          lo_alv_colum ?= lo_alv_columns->get_column( columnname = |{ <component>-name }| ).
-          lo_alv_colum->set_alignment( value = if_salv_c_alignment=>centered ).
+        LOOP AT lt_columns_table ASSIGNING FIELD-SYMBOL(<component>).
 
-          CASE <component>-name.
+          lo_alv_colum ?= <component>-r_column.
+          <component>-r_column->set_alignment( value = if_salv_c_alignment=>centered ).
+
+          CASE <component>-columnname.
 
             WHEN 'TRKORR'.
               lo_alv_colum->set_cell_type( if_salv_c_cell_type=>hotspot ).
@@ -874,37 +919,6 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
         ENDLOOP.
       CATCH cx_root INTO DATA(lcx_root).
         MESSAGE lcx_root->get_text( ) TYPE 'E'.
-    ENDTRY.
-
-  ENDMETHOD.
-
-  METHOD get_field_list.
-    DATA:
-      lr_strucdescr TYPE REF TO cl_abap_structdescr,
-      lr_tabledesct TYPE REF TO cl_abap_tabledescr,
-      lr_data       TYPE REF TO data.
-
-    TRY.
-
-        IF im_r_data IS SUPPLIED.
-          lr_data = im_r_data.
-          lr_strucdescr ?= cl_abap_structdescr=>describe_by_data_ref( p_data_ref = lr_data ).
-        ELSEIF im_s_struc IS SUPPLIED.
-          CREATE DATA lr_data LIKE im_s_struc.
-          lr_strucdescr ?= cl_abap_structdescr=>describe_by_data_ref( p_data_ref = lr_data ).
-        ELSEIF im_t_table IS SUPPLIED.
-          CREATE DATA lr_data LIKE im_t_table.
-          lr_tabledesct ?= cl_abap_tabledescr=>describe_by_data_ref( p_data_ref = lr_data ).
-          lr_strucdescr ?= lr_tabledesct->get_table_line_type( ).
-        ENDIF.
-
-        r_result = cl_salv_data_descr=>read_structdescr( r_structdescr = lr_strucdescr ).
-
-        ex_t_components = lr_strucdescr->get_components( ).
-
-      CATCH cx_sy_ref_is_initial.
-      CATCH cx_root.
-
     ENDTRY.
 
   ENDMETHOD.
@@ -1009,11 +1023,11 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
         lv_tr_filename      = |{ <alv>-trkorr+4(6) }.{ <alv>-trkorr(3) }|.
 
         IF syst-index EQ 1.
-          lv_server_path    =    gc_tr_file-data_path.
-          lv_tr_filename    = |{ gc_tr_file-data_prefix }{ lv_tr_filename }|.   " R908261.SHD
+          lv_server_path    =    me->gc_tr_file-data_path.
+          lv_tr_filename    = |{ me->gc_tr_file-data_prefix }{ lv_tr_filename }|.   " R908261.SHD
         ELSE.
-          lv_server_path    =    gc_tr_file-cofiles_path.
-          lv_tr_filename    = |{ gc_tr_file-cofile_prefix }{ lv_tr_filename }|. " K908261.SHD
+          lv_server_path    =    me->gc_tr_file-cofiles_path.
+          lv_tr_filename    = |{ me->gc_tr_file-cofile_prefix }{ lv_tr_filename }|. " K908261.SHD
         ENDIF.
 
         lv_server_path      = |{ lv_dir_trans }/{ lv_server_path }/{ lv_tr_filename }|.
@@ -1135,11 +1149,11 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
     TRY.
 
         " Create object ALV TABLE
-        CALL METHOD cl_salv_table=>factory
+        cl_salv_table=>factory(
           IMPORTING
             r_salv_table = lo_alv_table " Basis Class Simple ALV Tables
           CHANGING
-            t_table      = lt_tr_import.
+            t_table      = lt_tr_import ).
 
 *        CALL METHOD me->go_alv_table->set_screen_status
 *          EXPORTING
@@ -1261,9 +1275,9 @@ CLASS lcl_zrequest_report IMPLEMENTATION.
                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
         ENDIF.
 
-        ch_s_tr_import-as4user    = <ls_tr_filedata>-text_buffer(12).
-        ch_s_tr_import-trfunction = <ls_tr_filedata>-text_buffer+13(1).
-        ch_s_tr_import-tarsystem  = <ls_tr_filedata>-text_buffer+15(10).
+        ch_s_tr_import-as4user    = <ls_tr_filedata>-text_buffer(12).    " Request user owner
+        ch_s_tr_import-trfunction = <ls_tr_filedata>-text_buffer+13(1).  " Function
+        ch_s_tr_import-tarsystem  = <ls_tr_filedata>-text_buffer+15(10). " System ID
 
         SPLIT <ls_tr_filedata>-text_buffer AT cl_abap_char_utilities=>newline INTO TABLE DATA(lt_segments).
 
@@ -1621,12 +1635,12 @@ CLASS lcl_progress_indicator IMPLEMENTATION.
           lv_output_i = abap_true.
         ENDIF.
 
-        CALL METHOD cl_progress_indicator=>progress_indicate
+        cl_progress_indicator=>progress_indicate(
           EXPORTING
             i_text               = lv_text          " Progress Text (If no message transferred in I_MSG*)
             i_processed          = lv_processed     " Number of Objects Already Processed
             i_total              = me->total        " Total Number of Objects to Be Processed
-            i_output_immediately = lv_output_i.     " X = Display Progress Immediately
+            i_output_immediately = lv_output_i ).   " X = Display Progress Immediately
 
         me->rtime = lv_rtime.
 
@@ -1642,7 +1656,7 @@ CLASS lcl_progress_indicator IMPLEMENTATION.
 
   METHOD set_total.
     me->total = im_total.
-    CALL METHOD me->calc_ratio.
+    me->calc_ratio( ).
   ENDMETHOD.
 
   METHOD reset_processed.
@@ -1655,12 +1669,12 @@ CLASS lcl_progress_indicator IMPLEMENTATION.
 
   METHOD show_msg_standalone.
 
-    CALL METHOD cl_progress_indicator=>progress_indicate
+    cl_progress_indicator=>progress_indicate(
       EXPORTING
-        i_text               = im_v_text          " Progress Text (If no message transferred in I_MSG*)
-        i_processed          = 99     " Number of Objects Already Processed
-        i_total              = 100        " Total Number of Objects to Be Processed
-        i_output_immediately = abap_on.     " X = Display Progress Immediately
+        i_text               = im_v_text    " Progress Text (If no message transferred in I_MSG*)
+        i_processed          = 99           " Number of Objects Already Processed
+        i_total              = 100          " Total Number of Objects to Be Processed
+        i_output_immediately = abap_on ).   " X = Display Progress Immediately
 
   ENDMETHOD.
 
